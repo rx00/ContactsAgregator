@@ -1,5 +1,6 @@
 import urllib.request
 import json
+import sys
 import re
 
 from authlib import auth
@@ -92,4 +93,14 @@ def contacts_aggregator():
 
 
 if __name__ == '__main__':
-    contacts_aggregator()
+    if sys.argv[1] == "--help":
+        print("====> Генератор адресной книги <====\n"
+              "В данный момент, программа не нуждается в\n"
+              "дополнительных аргументах.\n"
+              "Запуск: python3 {}\n"
+              "программе требуются права на запись в папку"
+              .format(sys.argv[0]))
+    else:
+        if len(sys.argv) > 1:
+            print("Bad args: Правильное использование: python3 {} --help"
+                  .format(sys.argv[0]))
