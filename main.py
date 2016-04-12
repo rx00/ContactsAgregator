@@ -1,10 +1,10 @@
-import urllib.request
 import json
-import sys
 import re
+import sys
+import urllib.request
 
-from authlib import auth
-from vcardlib import vcard_gen
+from authlibs.vklib import auth
+from vcardlib import Card
 
 
 def parse_mobile(raw_mobile):
@@ -34,9 +34,9 @@ def extract_correct_mobiles(raw_users):
     """
     contacts = []
     for user in raw_users:
-        phone_number = parse_mobile(user[2])
-        if phone_number:
-            user[2] = phone_number
+        mobile_phone = parse_mobile(user["mobile_phone"])
+        if mobile_phone:
+            user["mobile_phone"] = mobile_phone
             contacts.append(user)
     return contacts
 
@@ -50,9 +50,9 @@ def filter_by_mobile(parsed_json):
     for user in parsed_json["response"]:
         if "mobile_phone" in user:
             if user["mobile_phone"] != "":
-                raw_users.append([user["last_name"],
-                                  user["first_name"],
-                                  user["mobile_phone"]])
+                raw_users.append({"last_name": user["last_name"],
+                                  "first_name": user["first_name"],
+                                  "mobile_phone": user["mobile_phone"]})
     return raw_users
 
 
@@ -72,7 +72,9 @@ def get_friends(auth_data):
     return parsed_json
 
 
-def contacts_aggregator():
+def contacts_aggregator(card_file="cards.vcf"):
+    print("===> Экспорт адресной книги <===")
+
     auth_data = auth(5333691, "friends", debug=True)
 
     if len(auth_data) == 0:
@@ -83,24 +85,31 @@ def contacts_aggregator():
     parsed_json = get_friends(auth_data)
     raw_users = filter_by_mobile(parsed_json)
     contacts = extract_correct_mobiles(raw_users)
+    print("Найдено {} валидных контактов у {} друзей!"
+          .format(len(contacts), len(raw_users)))
 
+    card_list = []
     if len(contacts) > 0:
-        vcard_gen(contacts[0], new=True)
-        for contact in contacts[1:]:
-            vcard_gen(contact)
-        print("Найдено {} валидных контактов у {} друзей!"
-              .format(len(contacts), len(raw_users)))
+        for contact in contacts:
+            card_list.append(Card(contact))
+        try:
+            with open(card_file, "w") as f:
+                for card in card_list:
+                    f.write(str(card))
+        except OSError:
+            print("Программа не может получить доступ к файлу {}!".format(card_file))
+    else:
+        print("Ваши друзья не хотят делиться мобильными телефонами ;(")
 
 
 if __name__ == '__main__':
-    if sys.argv[1] == "--help":
-        print("====> Генератор адресной книги <====\n"
-              "В данный момент, программа не нуждается в\n"
-              "дополнительных аргументах.\n"
-              "Запуск: python3 {}\n"
-              "программе требуются права на запись в папку"
-              .format(sys.argv[0]))
-    else:
-        if len(sys.argv) > 1:
-            print("Bad args: Правильное использование: python3 {} --help"
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--help":
+            print("====> Генератор адресной книги <====\n"
+                  "В данный момент, программа не нуждается в\n"
+                  "дополнительных аргументах.\n"
+                  "Запуск: python3 {}\n"
+                  "Программе требуются права на запись в папку"
                   .format(sys.argv[0]))
+    else:
+        contacts_aggregator()

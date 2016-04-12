@@ -4,7 +4,7 @@ import base64
 from Crypto.Cipher import AES
 
 
-def pad(blocked_string, block_size):  # TODO выделить шифрование в класс
+def pad(blocked_string, block_size):
     return blocked_string\
            + (block_size - len(blocked_string) % block_size)\
            * chr(block_size - len(blocked_string) % block_size)
@@ -20,7 +20,7 @@ def md5(text):
     return hasher.digest()
 
 
-def cryption(string, password, encrypt_it=False):
+def cryption(string, password, encrypt_it=False):  # TODO запилить докстринги, поправить переменные
     BS = 16
     IV = "some bad or not text"[:BS]
     cryptor = AES.new(password, AES.MODE_CBC, IV)
@@ -41,4 +41,4 @@ def decrypt(line, password):
     debased = base64.b64decode(line)
     adopted_pas = md5(password)
     decrypted = cryption(debased, adopted_pas)
-    return decrypted
+    return unpad(decrypted)

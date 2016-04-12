@@ -1,10 +1,12 @@
 import datetime
-import cryptor
+
+from utils.cryptor import encrypt, decrypt
+
 
 def authdata_create(social, userid, data, timestamp, password, file="tokenlist"):  # TODO выделить работу с авторизацией в класс
     user_string = social + ":"\
                   + userid + ":"\
-                  + str(cryptor.encrypt(data, password))[2:-1] + ":"\
+                  + str(encrypt(data, password))[2:-1] + ":"\
                   + str(timestamp_get(timestamp))\
                   + "\n"
     f = open(file, mode="a")
@@ -20,7 +22,7 @@ def authdata_get(password):
     token = auth_dump[2]
     timestamp = auth_dump[3]
     if timestamp > timestamp_get():
-        decrypted_byte_token = cryptor.unpad(cryptor.decrypt(token, password))  # TODO пофиксить вечный вызов криптора
+        decrypted_byte_token = decrypt(token, password)
         decrypted_token = str(decrypted_byte_token)[2:-1]
         return user_id, decrypted_token
     else:

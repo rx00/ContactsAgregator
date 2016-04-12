@@ -1,53 +1,46 @@
-def lines_pre_gen():
-    """
-    Возвращает заготовку карты (списком)
-    """
-    card = list()
-    card.append("BEGIN:VCARD")
-    card.append("VERSION:3.0")
-    card.append("END:VCARD")
-    return card
+class Card:
+    def __init__(self, user_info):
+        self.last_name = user_info["last_name"]
+        self.first_name = user_info["first_name"]
+        self.mobile_phone = user_info["mobile_phone"]
 
+    @staticmethod
+    def _lines_pre_gen():
+        """
+        Возвращает заготовку карты (списком)
+        для строкового представления карты
+        """
+        card = list()
+        card.append("BEGIN:VCARD")
+        card.append("VERSION:3.0")
+        card.append("END:VCARD")
+        return card
 
-def lines_fill(user_info):
-    """
-    по списку контактных данных
-    возвращает отформатированную, дозаполненную
-    карту (списком)
-    """
-    card_lines = lines_pre_gen()
+    def __str__(self):
+        """
+        преобразует карту в ее строковое представление
+        """
+        card_lines = Card._lines_pre_gen()
 
-    last_name = user_info[0]
-    first_name = user_info[1]
-    phone_number = user_info[2]
+        last_name = self.last_name
+        first_name = self.first_name
+        mobile_phone = self.mobile_phone
 
-    name_line = "N:" + last_name + ";" + first_name + ";;;"
-    full_name_line = "FN:" + first_name + " " + last_name
-    tel = "TEL;type=CELL;type=VOICE;type=pref:" + phone_number
+        name_line = "N:{};{};;;".format(last_name, first_name)
+        full_name_line = "FN:{} {}".format(first_name, last_name)
+        tel = "TEL;type=CELL;type=VOICE;type=pref:{}".format(mobile_phone)
 
-    card_lines.insert(2, name_line)
-    card_lines.insert(3, full_name_line)
-    card_lines.insert(4, tel)
-    return card_lines  # TODO logs
+        card_lines.insert(2, name_line)
+        card_lines.insert(3, full_name_line)
+        card_lines.insert(4, tel)
 
+        card = ""
+        for line in card_lines:
+            card += line + "\n"
 
-def vcard_gen(user_info, filename="cards.vcf", new=False):
-    """
-    по списку контактых данных создает vcard пользователя
-    опционально можно указать имя файла
-    опционально можно указать, создавать ли новый файл, или дописывать в старый
-    """
-    card = lines_fill(user_info)
-    if new:
-        mode = "w"
-    else:
-        mode = "a"
-    f = open(filename, mode)  # TODO обработка ошибок! + имя файла по юзверю
-    for line in card:
-        f.write(line + "\n")
-    f.close()
+        return card  # TODO logs
 
 
 if __name__ == '__main__':
     print("This library can't be started manually!")
-    print("Try to import it in your code! EX: vcard_gen(user_info)")
+    print("Try to import it in your code! EX: Card(user_dict)")
