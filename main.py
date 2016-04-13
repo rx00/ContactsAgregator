@@ -3,7 +3,7 @@ import re
 import sys
 import urllib.request
 
-from authlibs.vklib import auth
+from authlibs.vklib import VkApi
 from vcardlib import Card
 
 
@@ -61,8 +61,8 @@ def get_friends(auth_data):
     по данным авторизации запрашивает список друзей пользователя
     выводит объект json с данными друзей
     """
-    vk_id = auth_data[0]
-    token = auth_data[1]
+    vk_id = auth_data.id
+    token = auth_data.token
     url = "https://api.vk.com/method/friends.get?user_id=" + \
           vk_id + \
           "&fields=contacts&lang=en&version=5.45" + \
@@ -75,9 +75,18 @@ def get_friends(auth_data):
 def contacts_aggregator(card_file="cards.vcf"):
     print("===> Экспорт адресной книги <===")
 
-    auth_data = auth(5333691, "friends", debug=True)
+    permissions = "friends"
+    client_id = 5333691
 
-    if len(auth_data) == 0:
+    auth_resources = {
+        "permissions": permissions,
+        "client_id": client_id
+    }
+
+    auth_data = VkApi(auth_resources)
+    # auth_data = auth(5333691, "friends", debug=True)
+
+    if auth_data.token == ():
         print("Авторизация не удалась")
         exit()
     print("Вы успешно авторизовались!")
