@@ -86,7 +86,7 @@ def contacts_aggregator(card_file="cards.vcf"):
     auth_data = VkApi(auth_resources)
     # auth_data = auth(5333691, "friends", debug=True)
 
-    if auth_data.token == ():
+    if auth_data.token == "":
         print("Авторизация не удалась")
         exit()
     print("Вы успешно авторизовались!")
