@@ -38,7 +38,7 @@ class Card:
         for line in card_lines:
             card += line + "\n"
 
-        return card  # TODO logs
+        return card
 
 
 if __name__ == '__main__':

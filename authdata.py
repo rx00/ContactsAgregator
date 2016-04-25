@@ -1,6 +1,33 @@
 import datetime
+import pickle
 
 from utils.cryptor import encrypt, decrypt
+
+
+def authdata_read(filename="data"):
+    """
+    чтение данных о пользователе из файла
+    получаем на вход имя файла
+    """
+    try:
+        with open(filename, "rb") as f:
+            auth_info = pickle.load(f)
+            return auth_info
+    except OSError:
+        print("Нет доступа к файлу {}".format(filename))
+        return ()
+
+
+def authdata_write(auth_info, filename="data"):
+    """
+    запись данных о пользователе в файла
+    получаем структуру данных и имя файла
+    """
+    try:
+        with open(filename, "wb") as f:
+            pickle.dump(auth_info, f)
+    except OSError:
+        print("Нет доступа к файлу {}".format(filename))
 
 
 def authdata_create(social, userid, data, timestamp, password, file="tokenlist"):  # TODO выделить работу с авторизацией в класс
@@ -8,7 +35,7 @@ def authdata_create(social, userid, data, timestamp, password, file="tokenlist")
                   + userid + ":"\
                   + str(encrypt(data, password))[2:-1] + ":"\
                   + str(timestamp_get(timestamp))\
-                  + "\n"
+                  + "\n" # хрень, надо энкодить, а не в стринги гонять
     f = open(file, mode="a")
     f.write(user_string)
 
@@ -30,6 +57,10 @@ def authdata_get(password):
 
 
 def timestamp_get(timestamp=0):
+    """
+    при запуске без аргументов вернет текущее время (целое число)
+    при запуске с аргументом (кол-во секунд), вернет (текущая дата + секунды из аргумента)
+    """
     current_time = datetime.datetime.now()
     additional = datetime.timedelta(seconds=timestamp)
     timestamp = int((current_time + additional).timestamp())

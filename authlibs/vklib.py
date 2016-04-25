@@ -51,7 +51,7 @@ class VkApi:
         if response == "":
             raise ValueError("Empty line!")
         raw_html_lines = response.split("\n")
-        inputs_list = list()
+        inputs_list = []
         for line in raw_html_lines:
             if "input type" in line and "function" not in line \
                     or "method=" in line:
@@ -135,12 +135,12 @@ class VkApi:
             elif "Для продолжения Вам необходимо войти" in response_page:
                 logging.debug("Login form opened")
                 answer_url = VkApi.auth_form_parser(response_page)
-                return 2, answer_url  # first auth
+                return 2, answer_url  # some trouble?0_o
 
             elif "Приложению будут доступны:" in response_page:
                 logging.debug("Access button form opened")
                 answer_url = VkApi.post_auth_verifier(response_page)
-                return 5, answer_url  # press button
+                return 5, answer_url  # first auth in current app
 
             else:
                 return 6,  # something_bad
