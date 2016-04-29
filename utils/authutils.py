@@ -12,9 +12,17 @@ def text_caller(*args, private=False):
     string = ""
     while not string:
         if private:
-            string = getpass.getpass(output_text)
+            try:
+                string = getpass.getpass(output_text)
+            except KeyboardInterrupt:
+                print("\nВы прервали ввод пароля! Выход из программы!")
+                exit()
         else:
-            string = input(output_text)
+            try:
+                string = input(output_text)
+            except KeyboardInterrupt:
+                print("\nВы прервали ввод строки! Выход из программы!")
+                exit()
         if string == "":
             print("Поле", raw_text.lower(), "не может быть пустым!")
         else:
