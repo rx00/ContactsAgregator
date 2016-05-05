@@ -1,10 +1,22 @@
 import json
 import re
 import sys
+import logging
 import urllib.request
 
 from authlibs.vklib import VkApi
 from vcardlib import Card
+
+
+def init_logger(debug=False):
+    if debug:
+        debug_level = logging.DEBUG
+    else:
+        debug_level = logging.CRITICAL
+
+    logging.basicConfig(format="[%(filename)s] [%(asctime)s] %(message)s",
+                        level=debug_level,
+                        filename="debug.log")
 
 
 def parse_mobile(raw_mobile):
@@ -50,13 +62,16 @@ def filter_by_mobile(parsed_json):
     for user in parsed_json["response"]:
         if "mobile_phone" in user:
             if user["mobile_phone"] != "":
-                raw_users.append({"last_name": user["last_name"],
+                raw_users.append({"vk_id": user["user_id"],
+                                  "domain": user["domain"],
+                                  "photo_50": user["photo_50"],
+                                  "last_name": user["last_name"],
                                   "first_name": user["first_name"],
                                   "mobile_phone": user["mobile_phone"]})
     return raw_users
 
 
-def get_friends(auth_data):
+def get_friends(auth_data):  # TODO забросить в vklib
     """
     по данным авторизации запрашивает список друзей пользователя
     выводит объект json с данными друзей
@@ -65,7 +80,7 @@ def get_friends(auth_data):
     token = auth_data.token
     url = "https://api.vk.com/method/friends.get?user_id=" + \
           vk_id + \
-          "&fields=contacts&lang=en&version=5.45" + \
+          "&fields=domain,contacts,photo_50&lang=en&version=5.45" + \
           "&access_token=" + token
     response = urllib.request.urlopen(url).read().decode()
     parsed_json = json.loads(response)
@@ -75,16 +90,12 @@ def get_friends(auth_data):
 def contacts_aggregator(card_file="cards.vcf"):
     print("===> Экспорт адресной книги <===")
 
-    permissions = "friends"
-    client_id = 5333691
-
     auth_resources = {
-        "permissions": permissions,
-        "client_id": client_id
+        "permissions": "friends",
+        "client_id": 5333691
     }
 
     auth_data = VkApi(auth_resources)
-    # auth_data = auth(5333691, "friends", debug=True)
 
     if auth_data.token == "":
         print("Авторизация не удалась")
@@ -121,4 +132,5 @@ if __name__ == '__main__':
                   "Программе требуются права на запись в папку"
                   .format(sys.argv[0]))
     else:
+        init_logger(True)
         contacts_aggregator()

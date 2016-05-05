@@ -5,6 +5,8 @@ import logging
 
 from utils.authutils import text_caller
 
+logger = logging.getLogger(__name__)
+
 
 class VkApi:
     def __init__(self, user_data):
@@ -38,8 +40,8 @@ class VkApi:
             "&scope=" + str(permissoins) + \
             "&display=mobile" + \
             "&v=" + str(vk_api_version)
-        logging.debug("Auth Form generated for app_id = " + str(client_id) +
-                      " with permissions = " + str(permissoins))
+        logger.debug("Auth Form generated for app_id = " + str(client_id) +
+                     " with permissions = " + str(permissoins))
         return url
 
     @staticmethod
@@ -69,7 +71,7 @@ class VkApi:
         full_url = address + "?" + ''.join(arg_list) + \
                              "email=" + urllib.request.quote(login) + \
                              "&pass=" + urllib.request.quote(password)  # UTF8 fix
-        logging.debug("Formed auth-request: " + full_url[:35] + "[*]")  # logs
+        logger.debug("Formed auth-request: " + full_url[:35] + "[*]")  # logs
         return full_url
 
     @staticmethod
@@ -87,9 +89,9 @@ class VkApi:
             position = line.find("/login?act=authcheck_code")
             if position >= 0:
                 hash_line = line[position:-13]  # TODO сделать авто-поиск позиции
-        check_code = text_caller("Auth SMS code")
+        check_code = urllib.request.quote(text_caller("Auth SMS code"))
         full_url = address + hash_line + "&code=" + check_code + "&remember=0"
-        logging.debug("Formed double-auth request: " + full_url[:35] + "[*]")
+        logger.debug("Formed double-auth request: " + full_url[:35] + "[*]")
         return full_url
 
     @staticmethod
@@ -106,7 +108,7 @@ class VkApi:
             position = line.find("https://login.vk.com/?act=grant_access")
             if position >= 0:
                 full_url = line[position:-2]
-        logging.debug("Formed button-answer request: " + full_url[:35] + "[*]")
+        logger.debug("Formed button-answer request: " + full_url[:35] + "[*]")
         return full_url
 
     @staticmethod
@@ -118,13 +120,13 @@ class VkApi:
         """
         response_url = response.geturl()
         if "://oauth.vk.com/blank.html#access_token=" in response_url:
-            logging.debug("Found Token")
+            logger.debug("Found Token")
             return 1, response_url
         else:
             # print(response_url)  # hard debug line
             response_page = response.read().decode()
             if "неверный логин или пароль" in response_page:
-                logging.debug("Bad Login")
+                logger.debug("Bad Login")
                 return 4,  # bad login
 
             elif "<b>код подтверждения</b> из SMS" in response_page:
@@ -133,12 +135,12 @@ class VkApi:
                 return 3, answer_url  # sms auth
 
             elif "Для продолжения Вам необходимо войти" in response_page:
-                logging.debug("Login form opened")
+                logger.debug("Login form opened")
                 answer_url = VkApi.auth_form_parser(response_page)
                 return 2, answer_url  # some trouble?0_o
 
             elif "Приложению будут доступны:" in response_page:
-                logging.debug("Access button form opened")
+                logger.debug("Access button form opened")
                 answer_url = VkApi.post_auth_verifier(response_page)
                 return 5, answer_url  # first auth in current app
 
@@ -160,24 +162,13 @@ class VkApi:
         user_id_start_key = "user_id="
         user_id_start = token_url.find(user_id_start_key)
         user_id = token_url[user_id_start+len(user_id_start_key):]
-        logging.debug("Parsed user id = " + user_id +
-                      " with token = " + token[:5] +
-                      "*")
+        logger.debug("Parsed user id = " + user_id +
+                     " with token = " + token[:5] +
+                     "*")
         return {"user_id": user_id, "token": token}
 
     @staticmethod
-    def debug_config(enabled, filename):
-        if enabled:
-            debug_level = logging.DEBUG
-        else:
-            debug_level = logging.CRITICAL
-
-        logging.basicConfig(format="%(levelname)-3s [%(asctime)s] %(message)s",
-                            level=debug_level,
-                            filename=filename)
-
-    @staticmethod
-    def auth(client_id, permissions, debug=False, debug_file="VK_Auth.log"):  # TODO фикс дебага!, сделать адекватно!
+    def auth(client_id, permissions):  # TODO фикс дебага!, сделать адекватно!
         """
         Фукция возвращает данные авторизации по правам и идентификатору приложения
         Опционально, функция может писать в дебаг файл (debug=True)
@@ -190,8 +181,7 @@ class VkApi:
             urllib.request.HTTPRedirectHandler
         )
 
-        VkApi.debug_config(debug, debug_file)
-        logging.debug("=== Auth Session ===")
+        logger.debug("=== Auth Session ===")
 
         first_response = browser.open(VkApi.request_builder(client_id, permissions))
         auth_answer = VkApi.auth_form_parser(first_response.read().decode())

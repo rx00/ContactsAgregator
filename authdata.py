@@ -1,7 +1,7 @@
 import datetime
 import pickle
 
-from utils.cryptor import encrypt, decrypt
+from utils.cryptor import AESEncrypt
 
 
 def authdata_read(filename="data"):
@@ -31,9 +31,10 @@ def authdata_write(auth_info, filename="data"):
 
 
 def authdata_create(social, userid, data, timestamp, password, file="tokenlist"):  # TODO выделить работу с авторизацией в класс
+
     user_string = social + ":"\
                   + userid + ":"\
-                  + str(encrypt(data, password))[2:-1] + ":"\
+                  + str(AESEncrypt.encrypt(data, password))[2:-1] + ":"\
                   + str(timestamp_get(timestamp))\
                   + "\n" # хрень, надо энкодить, а не в стринги гонять
     f = open(file, mode="a")
