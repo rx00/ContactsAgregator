@@ -16,6 +16,10 @@ def authdata_read(filename="data"):
         with open(filename, "rb") as f:
             auth_info = pickle.load(f)
             return auth_info
+    except FileNotFoundError:
+        print("Файл данных авторизации \"{}\" не найден!"
+              .format(filename))
+        return {}
     except OSError:
         print("Нет доступа к файлу {}".format(filename))
         return {}
