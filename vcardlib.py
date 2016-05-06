@@ -9,11 +9,12 @@ logger = logging.getLogger(__name__)
 class Card:
     def __init__(self, user_info):  # card logging?
         self.vk_id = user_info["vk_id"]
-        self.domain = user_info["domain"]
+        self.domain = user_info["domain"]  # merge factor
         self.photo = user_info["photo_50"]
-        self.last_name = user_info["last_name"]
-        self.first_name = user_info["first_name"]
+        self.last_name = user_info["last_name"]  # merge factor
+        self.first_name = user_info["first_name"]  # merge factor
         self.mobile_phone = user_info["mobile_phone"]
+        self.image = ""
 
     @staticmethod
     def _lines_pre_gen():
@@ -28,16 +29,20 @@ class Card:
         return card
 
     def _photo_encoder(self):
+        """
+        изменяет поле photo
+        из ссылки на фотографию, получаем
+        """
         try:
             if self.photo[-3:] == "jpg":
                 with urlopen(self.photo) as f:
                     string = f.read()
-                    self.photo = binascii.b2a_base64(string).decode()
+                    self.image = binascii.b2a_base64(string).decode()
                     logger.debug("Downloaded and encoded image for {}!"
                                  .format(self.vk_id))
         except URLError:
             logger.debug("Can't reach photo file!")
-            self.photo = ""
+            self.image = ""
 
     def __str__(self):
         """
@@ -49,7 +54,7 @@ class Card:
         last_name = self.last_name
         first_name = self.first_name
         mobile_phone = self.mobile_phone
-        photo = self.photo
+        photo = self.image
 
         name_line = "N:{};{};;;".format(last_name, first_name)
         full_name_line = "FN:{} {}".format(first_name, last_name)

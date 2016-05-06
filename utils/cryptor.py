@@ -4,10 +4,9 @@ from Crypto.Cipher import AES
 
 
 class AESEncrypt:
-    def __init__(self, message, key, raw=True):
+    def __init__(self, message, key):
         self.message = message
         self.key = key
-        self._raw = raw
 
     def __str__(self):
         return str(self.message)
@@ -18,8 +17,8 @@ class AESEncrypt:
         дополняет блок до кратного размерности
         """
         return blocked_string\
-               + (block_size - len(blocked_string) % block_size)\
-               * chr(block_size - len(blocked_string) % block_size)
+            + (block_size - len(blocked_string) % block_size)\
+            * chr(block_size - len(blocked_string) % block_size)
 
     @staticmethod
     def _unpad(unblock_string):
@@ -45,14 +44,12 @@ class AESEncrypt:
             return cryptor.decrypt(string)
 
     def encrypt(self):
-        if self._raw:
-            line = self.message
-            password = self.key
-            line = AESEncrypt._pad(line, 16)
-            adopted_pas = AESEncrypt._md5(password)
-            crypted_bytes = AESEncrypt._cryption(line, adopted_pas, encrypt_it=True)
-            self.message = base64.b64encode(crypted_bytes)
-            self._raw = False
+        line = self.message
+        password = self.key
+        line = AESEncrypt._pad(line, 16)
+        adopted_pas = AESEncrypt._md5(password)
+        crypted_bytes = AESEncrypt._cryption(line, adopted_pas, encrypt_it=True)
+        return base64.b64encode(crypted_bytes)
 
     def decrypt(self):
         """
@@ -60,18 +57,16 @@ class AESEncrypt:
         возвращает пустую строку при ошибке дешифрования(корректность определяется по попытке преобразовать в utf-8),
         непустую строку, при успешном дешифровании
         """
-        if not self._raw:
-            line = self.message
-            password = self.key
-            debased = base64.b64decode(line)
-            adopted_pas = AESEncrypt._md5(password)
-            decrypted = AESEncrypt._cryption(debased, adopted_pas)
-            cooked_string = AESEncrypt._unpad(decrypted).decode()
-            if cooked_string:
-                self.message = cooked_string
-                self._raw = True
-            else:
-                raise AESEncryptError("Bad Pass")
+        line = self.message
+        password = self.key
+        debased = base64.b64decode(line)
+        adopted_pas = AESEncrypt._md5(password)
+        decrypted = AESEncrypt._cryption(debased, adopted_pas)
+        cooked_string = AESEncrypt._unpad(decrypted).decode()
+        if cooked_string:
+            return cooked_string
+        else:
+            raise AESEncryptError("Bad Pass")
 
 
 class AESEncryptError:
@@ -80,10 +75,4 @@ class AESEncryptError:
 
     def __str__(self):
         return self.message
-
-
-a = AESEncrypt("some string", "some key")
-a.encrypt()
-a.decrypt()
-print(a)
 

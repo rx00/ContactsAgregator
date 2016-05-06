@@ -2,12 +2,12 @@ import datetime
 import pickle
 
 from utils.cryptor import AESEncrypt
+from utils.cryptor import AESEncryptError
 
 
 def authdata_read(filename="data"):
     """
     чтение данных о пользователе из файла
-    получаем на вход имя файла
     """
     try:
         with open(filename, "rb") as f:
@@ -15,46 +15,18 @@ def authdata_read(filename="data"):
             return auth_info
     except OSError:
         print("Нет доступа к файлу {}".format(filename))
-        return ()
+        return {}
 
 
 def authdata_write(auth_info, filename="data"):
     """
-    запись данных о пользователе в файла
-    получаем структуру данных и имя файла
+    запись данных о пользователе в файл
     """
     try:
         with open(filename, "wb") as f:
             pickle.dump(auth_info, f)
     except OSError:
         print("Нет доступа к файлу {}".format(filename))
-
-
-def authdata_create(social, userid, data, timestamp, password, file="tokenlist"):  # TODO выделить работу с авторизацией в класс
-
-    user_string = social + ":"\
-                  + userid + ":"\
-                  + str(AESEncrypt.encrypt(data, password))[2:-1] + ":"\
-                  + str(timestamp_get(timestamp))\
-                  + "\n" # хрень, надо энкодить, а не в стринги гонять
-    f = open(file, mode="a")
-    f.write(user_string)
-
-
-def authdata_get(password):
-    f = open("tokenlist")
-    line_list = f.readlines()
-    auth_dump = line_list[0].split(":")
-    f.close()
-    user_id = auth_dump[1]
-    token = auth_dump[2]
-    timestamp = auth_dump[3]
-    if timestamp > timestamp_get():
-        decrypted_byte_token = decrypt(token, password)
-        decrypted_token = str(decrypted_byte_token)[2:-1]
-        return user_id, decrypted_token
-    else:
-        return ()
 
 
 def timestamp_get(timestamp=0):
@@ -68,8 +40,34 @@ def timestamp_get(timestamp=0):
     return timestamp
 
 
-def get_token(social):
-    pass
+def write_vk_token(token, vk_id, masterkey, timestamp):
+    """
+    по ключу шифрует данные пользователя (его token)
+    """
+    cryptor = AESEncrypt(token, masterkey)
+    good_token = cryptor.encrypt()
+    time = timestamp_get(timestamp-1000)
+    data = {"id": vk_id, "token": good_token, "timestamp": time}
+    authdata_write(data)
 
-  #  authdata_create("vk", "373645", "token=it's the token!", "86400", "123456")
-  #  authdata_get()
+
+def get_vk_token(masterkey):
+    """
+    по мастер-ключу восстанавливает непросроченный токен от ВКонтакте
+    иначе возвращает пустую строку
+    """
+    data = authdata_read()
+    if len(data) == 0:
+        return {}
+    else:
+        if int(data["timestamp"]) > int(timestamp_get()):
+            encrypted_token = data["token"]
+            cryptor = AESEncrypt(encrypted_token, masterkey)
+            try:
+                token = cryptor.decrypt()
+                data["token"] = token
+                return data
+            except AESEncryptError:
+                return {}
+        else:
+            return {}

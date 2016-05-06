@@ -1,11 +1,16 @@
 import json
 import re
+import os
 import sys
 import logging
 import urllib.request
 
+from utils.authutils import text_caller
 from authlibs.vklib import VkApi
 from vcardlib import Card
+
+from authdata import get_vk_token
+from authdata import write_vk_token
 
 
 def init_logger(debug=False):
@@ -95,7 +100,22 @@ def contacts_aggregator(card_file="cards.vcf"):
         "client_id": 5333691
     }
 
+    if not os.path.isfile("data"):
+        print("Для начала работы с программой, придумайте свой пароль,\n"
+              "ваши данные для авторизации!")
+
+    key = text_caller("Master-key")
+    vk_data = get_vk_token(key)
+    bad_token = True
+    if "token" in vk_data:
+        auth_resources["token"] = vk_data["token"]
+        auth_resources["id"] = vk_data["id"]
+        bad_token = False
+
     auth_data = VkApi(auth_resources)
+
+    if bad_token:
+        write_vk_token(auth_data.token, auth_data.id, key, 86400)
 
     if auth_data.token == "":
         print("Авторизация не удалась")
