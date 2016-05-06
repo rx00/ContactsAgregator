@@ -32,6 +32,8 @@ def authdata_write(auth_info, filename="data"):
     try:
         with open(filename, "wb") as f:
             pickle.dump(auth_info, f)
+        print("Создан новый файл авторизации!")
+        logger.debug("New auth file created!")
     except OSError:
         print("Нет доступа к файлу {}".format(filename))
 

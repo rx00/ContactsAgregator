@@ -5,6 +5,8 @@ import sys
 import logging
 import urllib.request
 
+from importlib.util import find_spec
+
 from utils.authutils import text_caller
 from authlibs.vklib import VkApi
 from vcardlib import Card
@@ -14,6 +16,9 @@ from authdata import write_vk_token
 
 
 def init_logger(debug=False):
+    """
+    главный логгер
+    """
     if debug:
         debug_level = logging.DEBUG
     else:
@@ -93,42 +98,70 @@ def get_friends(auth_data):  # TODO забросить в vklib
           "&access_token=" + token
     response = urllib.request.urlopen(url).read().decode()
     parsed_json = json.loads(response)
-    return parsed_json
+
+    if "error" in parsed_json:
+        return {}
+    else:
+        return parsed_json
 
 
-def contacts_aggregator(card_file="cards.vcf"):
-    print("===> Экспорт адресной книги <===")
-    logging.debug("===> Application started <===")
-
+def run_vk_auth():
+    """
+    главный авторизатор ВКонтакте
+    """
     auth_resources = {
         "permissions": "friends",
         "client_id": 5333691
     }
 
-    if not os.path.isfile("data"):
-        print("Для начала работы с программой, придумайте свой пароль,\n"
-              "ваши данные для авторизации!")
+    crypto_factor = find_spec("Crypto")
+    found = crypto_factor is not None
 
-    key = text_caller("Master-key")
-    vk_data = get_vk_token(key)
     bad_token = True
-    if "token" in vk_data:
-        auth_resources["token"] = vk_data["token"]
-        auth_resources["id"] = vk_data["id"]
-        bad_token = False
-        logging.debug("Old data mined, vk session still alive!")
+    key = ""
+
+    if found:
+        if not os.path.isfile("data"):
+            print("Для начала работы с программой, придумайте свой пароль,\n"
+                  "ваши данные для авторизации!")
+        key = text_caller("Master-key")
+        vk_data = get_vk_token(key)
+        if "token" in vk_data:
+            auth_resources["token"] = vk_data["token"]
+            auth_resources["id"] = vk_data["id"]
+            bad_token = False
+            logging.debug("Old data mined, vk session still alive!")
+    else:
+        print("Библиотека Crypto не найдена!\n"
+              "Сохранение данных авторизации не поддерживается!")
 
     auth_data = VkApi(auth_resources)
 
-    if bad_token:
-        write_vk_token(auth_data.token, auth_data.id, key, 86400)
-
+    if found:
+        if bad_token:
+            write_vk_token(auth_data.token, auth_data.id, key, 86400)
     if auth_data.token == "":
         print("Авторизация не удалась")
         exit()
     print("Вы успешно авторизовались!")
+    return auth_data
 
+
+def contacts_aggregator(card_file="cards.vcf"):  # TODO бросить в аргументы файл карт
+    print("===> Экспорт адресной книги <===")
+    logging.debug("===> Application started <===")
+
+    auth_data = run_vk_auth()
     parsed_json = get_friends(auth_data)
+
+    if len(parsed_json) == 0:
+        auth_resourses = {
+            "permissions": "friends",
+            "client_id": 5333691
+        }
+        auth_data = VkApi(auth_resourses)
+        parsed_json = get_friends(auth_data)
+
     raw_users = filter_by_mobile(parsed_json)
     contacts = extract_correct_mobiles(raw_users)
     print("Найдено {} валидных контактов у {} друзей!"
@@ -139,9 +172,14 @@ def contacts_aggregator(card_file="cards.vcf"):
         for contact in contacts:
             card_list.append(Card(contact))
         try:
-            with open(card_file, "w") as card_store:
+            with open(card_file, "w") as card_storage:
+                i = 1
                 for card in card_list:
-                    card_store.write(str(card))
+                    card_storage.write(str(card))
+                    print("[{}/{}] Контакт {} {} создан".format(
+                        i, len(contacts), card.last_name_en, card.first_name_en
+                    ))
+                    i += 1
         except OSError:
             print("Программа не может получить доступ к файлу {}!"
                   .format(card_file))
@@ -150,14 +188,18 @@ def contacts_aggregator(card_file="cards.vcf"):
 
 
 if __name__ == '__main__':
+    debug = False
     if len(sys.argv) > 1:
-        if sys.argv[1] == "--help":
+        if "--help" in sys.argv:
             print("====> Генератор адресной книги <====\n"
                   "В данный момент, программа не нуждается в\n"
                   "дополнительных аргументах.\n"
                   "Запуск: python3 {}\n"
                   "Программе требуются права на запись в папку"
                   .format(sys.argv[0]))
-    else:
-        init_logger(True)  # TODO arg parse
-        contacts_aggregator()
+            exit()
+        elif "--debug" in sys.argv:
+            debug = True
+            print("Программа запущена в режиме дебага!")
+    init_logger(debug)
+    contacts_aggregator()

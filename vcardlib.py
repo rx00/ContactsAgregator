@@ -11,8 +11,8 @@ class Card:
         self.vk_id = user_info["vk_id"]
         self.domain = user_info["domain"]  # merge factor
         self.photo = user_info["photo_50"]
-        self.last_name = user_info["last_name"]  # merge factor
-        self.first_name = user_info["first_name"]  # merge factor
+        self.last_name_en = user_info["last_name"]  # merge factor
+        self.first_name_en = user_info["first_name"]  # merge factor
         self.mobile_phone = user_info["mobile_phone"]
         self.image = ""
 
@@ -34,7 +34,7 @@ class Card:
         base64 строку в image
         """
         try:
-            if self.photo[-3:] == "jpg":
+            if self.photo[-3:] == "jpg":  # jpg у юзеров, png - системное, вк жлобит место
                 with urlopen(self.photo) as f:
                     string = f.read()
                     self.image = binascii.b2a_base64(string).decode()
@@ -51,8 +51,8 @@ class Card:
         card_lines = Card._lines_pre_gen()
         self._photo_encoder()
 
-        last_name = self.last_name
-        first_name = self.first_name
+        last_name = self.last_name_en
+        first_name = self.first_name_en
         mobile_phone = self.mobile_phone
         photo = self.image
 
