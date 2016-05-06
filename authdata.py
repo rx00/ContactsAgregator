@@ -79,3 +79,6 @@ def get_vk_token(masterkey):
                 return {}
         else:
             return {}
+
+if __name__ == '__main__':
+    print("Nope, I am a lib!")

@@ -27,3 +27,7 @@ def text_caller(*args, private=False):
             print("Поле", raw_text.lower(), "не может быть пустым!")
         else:
             return string
+
+
+if __name__ == '__main__':
+    print("Nope, I am a lib!")

@@ -159,5 +159,5 @@ if __name__ == '__main__':
                   "Программе требуются права на запись в папку"
                   .format(sys.argv[0]))
     else:
-        init_logger(True)
+        init_logger(True)  # TODO arg parse
         contacts_aggregator()

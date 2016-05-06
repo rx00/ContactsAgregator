@@ -71,3 +71,7 @@ class AESEncrypt:
 
 class AESEncryptError(Exception):
     pass
+
+
+if __name__ == '__main__':
+    print("Nope, I am a lib!")
