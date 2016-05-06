@@ -30,8 +30,8 @@ class Card:
 
     def _photo_encoder(self):
         """
-        изменяет поле photo
-        из ссылки на фотографию, получаем
+        качаем фото по ссылки из поля photo и пишем
+        base64 строку в image
         """
         try:
             if self.photo[-3:] == "jpg":
