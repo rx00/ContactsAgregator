@@ -36,7 +36,7 @@ class AESEncrypt:
     @staticmethod
     def _cryption(string, password, encrypt_it=False):
         block_size = 16
-        init_vector = "some bad or not text"[:block_size]  # TODO дописать автогенератор вектора инициализации, чуть-чуть уязвимость
+        init_vector = "some bad or not text"[:block_size]  # TODO FIX КОСТЫЛЬ!
         cryptor = AES.new(password, AES.MODE_CBC, init_vector)
         if encrypt_it:
             return cryptor.encrypt(string)
@@ -66,13 +66,8 @@ class AESEncrypt:
         if cooked_string:
             return cooked_string
         else:
-            raise AESEncryptError("Bad Pass")
+            raise AESEncryptError
 
 
-class AESEncryptError:
-    def __init__(self, message):
-        self.message = message
-
-    def __str__(self):
-        return self.message
-
+class AESEncryptError(Exception):
+    pass

@@ -40,7 +40,11 @@ def parse_mobile(raw_mobile):
     elif len(mobile) == 11:
         mobile = "+7" + mobile[1:]
     formed_mobile = "{} ({}) {}-{}-{}"\
-        .format(mobile[0:2], mobile[2:5], mobile[5:8],  mobile[8:10], mobile[10:])
+        .format(mobile[0:2],
+                mobile[2:5],
+                mobile[5:8],
+                mobile[8:10],
+                mobile[10:])
     return formed_mobile
 
 
@@ -94,6 +98,7 @@ def get_friends(auth_data):  # TODO забросить в vklib
 
 def contacts_aggregator(card_file="cards.vcf"):
     print("===> Экспорт адресной книги <===")
+    logging.debug("===> Application started <===")
 
     auth_resources = {
         "permissions": "friends",
@@ -111,6 +116,7 @@ def contacts_aggregator(card_file="cards.vcf"):
         auth_resources["token"] = vk_data["token"]
         auth_resources["id"] = vk_data["id"]
         bad_token = False
+        logging.debug("Old data mined, vk session still alive!")
 
     auth_data = VkApi(auth_resources)
 
@@ -133,11 +139,12 @@ def contacts_aggregator(card_file="cards.vcf"):
         for contact in contacts:
             card_list.append(Card(contact))
         try:
-            with open(card_file, "w") as f:
+            with open(card_file, "w") as card_store:
                 for card in card_list:
-                    f.write(str(card))
+                    card_store.write(str(card))
         except OSError:
-            print("Программа не может получить доступ к файлу {}!".format(card_file))
+            print("Программа не может получить доступ к файлу {}!"
+                  .format(card_file))
     else:
         print("Ваши друзья не хотят делиться мобильными телефонами ;(")
 

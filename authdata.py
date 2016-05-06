@@ -1,8 +1,11 @@
 import datetime
 import pickle
+import logging
 
 from utils.cryptor import AESEncrypt
 from utils.cryptor import AESEncryptError
+
+logger = logging.getLogger(__name__)
 
 
 def authdata_read(filename="data"):
@@ -32,7 +35,8 @@ def authdata_write(auth_info, filename="data"):
 def timestamp_get(timestamp=0):
     """
     при запуске без аргументов вернет текущее время (целое число)
-    при запуске с аргументом (кол-во секунд), вернет (текущая дата + секунды из аргумента)
+    при запуске с аргументом (кол-во секунд), вернет
+    (текущая дата + секунды из аргумента)
     """
     current_time = datetime.datetime.now()
     additional = datetime.timedelta(seconds=timestamp)
