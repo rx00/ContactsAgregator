@@ -46,9 +46,9 @@ class AESEncrypt:
     def encrypt(self):
         line = self.message
         password = self.key
-        line = AESEncrypt._pad(line, 16)
-        adopted_pas = AESEncrypt._md5(password)
-        crypted_bytes = AESEncrypt._cryption(line, adopted_pas, encrypt_it=True)
+        line = self._pad(line, 16)
+        adopted_pas = self._md5(password)
+        crypted_bytes = self._cryption(line, adopted_pas, encrypt_it=True)
         return base64.b64encode(crypted_bytes)
 
     def decrypt(self):
@@ -60,9 +60,13 @@ class AESEncrypt:
         line = self.message
         password = self.key
         debased = base64.b64decode(line)
-        adopted_pas = AESEncrypt._md5(password)
-        decrypted = AESEncrypt._cryption(debased, adopted_pas)
-        cooked_string = AESEncrypt._unpad(decrypted).decode()
+        adopted_pas = self._md5(password)
+        decrypted = self._cryption(debased, adopted_pas)
+        try:
+            cooked_string = self._unpad(decrypted).decode()
+        except UnicodeDecodeError:
+            raise AESEncryptError
+
         if cooked_string:
             return cooked_string
         else:

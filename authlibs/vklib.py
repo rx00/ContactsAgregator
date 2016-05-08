@@ -2,6 +2,7 @@ import urllib.response
 import urllib.request
 import re
 import logging
+import json
 
 from utils.authutils import text_caller
 
@@ -23,6 +24,32 @@ class VkApi:
             else:
                 self.token = ""
                 self.id = ""
+
+    def get_friends(self, fields, lang="en"):  # TODO забросить в vklib
+        """
+        по данным авторизации запрашивает список друзей пользователя
+        выводит объект json с данными друзей
+        """
+        vk_id = self.id
+        token = self.token
+
+        fields = ",".join(fields)
+
+        url = "https://api.vk.com/method/friends.get?user_id=" + \
+              vk_id + \
+              "&fields=" + \
+              fields + \
+              "&lang=" + \
+              lang + \
+              "&version=5.45" + \
+              "&access_token=" + token
+        response = urllib.request.urlopen(url).read().decode()
+        parsed_json = json.loads(response)
+
+        if "error" in parsed_json:
+            return {}
+        else:
+            return parsed_json
 
     @staticmethod
     def request_builder(client_id, permissoins):

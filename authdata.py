@@ -8,7 +8,7 @@ from utils.cryptor import AESEncryptError
 logger = logging.getLogger(__name__)
 
 
-def authdata_read(filename="data"):
+def authdata_read(filename):
     """
     чтение данных о пользователе из файла
     """
@@ -25,7 +25,7 @@ def authdata_read(filename="data"):
         return {}
 
 
-def authdata_write(auth_info, filename="data"):
+def authdata_write(auth_info, filename):
     """
     запись данных о пользователе в файл
     """
@@ -50,7 +50,7 @@ def timestamp_get(timestamp=0):
     return timestamp
 
 
-def write_vk_token(token, vk_id, masterkey, timestamp):
+def write_vk_token(data_file, token, vk_id, masterkey, timestamp):
     """
     по ключу шифрует данные пользователя (его token)
     """
@@ -58,15 +58,15 @@ def write_vk_token(token, vk_id, masterkey, timestamp):
     good_token = cryptor.encrypt()
     time = timestamp_get(timestamp-1000)
     data = {"id": vk_id, "token": good_token, "timestamp": time}
-    authdata_write(data)
+    authdata_write(filename=data_file, auth_info=data)
 
 
-def get_vk_token(masterkey):
+def get_vk_token(data_file, masterkey):
     """
     по мастер-ключу восстанавливает непросроченный токен от ВКонтакте
     иначе возвращает пустую строку
     """
-    data = authdata_read()
+    data = authdata_read(data_file)
     if len(data) == 0:
         return {}
     else:
