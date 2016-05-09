@@ -25,6 +25,17 @@ class VkApi:
                 self.token = ""
                 self.id = ""
 
+    def verificator(self):
+        url = "https://api.vk.com/method/friends.get?access_token={}"\
+            .format(self.token)
+        answer = urllib.request.urlopen(url).read().decode()
+        json_answer = json.loads(answer)
+        if "id" in json_answer:
+            if str(json_answer["id"]) == str(self.id):
+                return True
+
+
+
     def get_friends(self, fields, lang="en"):  # TODO забросить в vklib
         """
         по данным авторизации запрашивает список друзей пользователя

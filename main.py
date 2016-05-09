@@ -55,7 +55,7 @@ class Main:
         else:
             print("Ваши друзья не хотят делиться мобильными телефонами ;(")
 
-    def run_vk_auth(self): # написать контроллер - восстановление/новая/старая
+    def run_vk_auth(self):
         """
         главный авторизатор ВКонтакте
         """
@@ -140,8 +140,8 @@ def main():
     """
     debug = False
     cards = "cards.vcf"
-    data_support = find_spec("Crypto") is not None
     data = "data"
+    data_support = find_spec("Crypto") is not None
 
     if len(sys.argv) > 1:
         if "--help" in sys.argv:
@@ -151,7 +151,7 @@ def main():
                   "Запуск: python3 {}\n"
                   "Программе требуются права на запись в папку"
                   .format(sys.argv[0]))
-            exit()
+            sys.exit()
         elif "--debug" in sys.argv:
             debug = True
             print("Программа запущена в режиме дебага!")
