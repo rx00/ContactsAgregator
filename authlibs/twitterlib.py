@@ -11,193 +11,178 @@ import time
 from hashlib import sha1
 from urllib.request import quote
 
-#refact
-import ssl
 
+class TwitterApi:
+    def __init__(self):
+        self.consumer_key = "1RiattuMQATlvkzfzC3YvuI3j"
+        self.consumer_secret = "LUtjZlx2Lymut8yxcXb8Je7L1u1jZAH9tP5M5SAYSXPgzJDvQt"
+        self.oauth_token = ""
+        self.oauth_token_secret = ""
+        self.screen_name = ""
+        self.user_id = ""
 
-def twitter_auth():
-    consumer_key = "1RiattuMQATlvkzfzC3YvuI3j"
-    consumer_secret = "LUtjZlx2Lymut8yxcXb8Je7L1u1jZAH9tP5M5SAYSXPgzJDvQt"
-    request_info = get_request_token(consumer_key, consumer_secret)
-    pin_code = get_pin_code(request_info["oauth_token"])
+    def auth(self):
+        # STEP 1: Get Request_Token
+        request_token_url = "https://api.twitter.com/oauth/request_token"
+        request_params = {
+            "oauth_callback": "oob",
+            "oauth_consumer_key": quote(self.consumer_key)
+        }
+        request_keys = [self.consumer_secret]
+        request_info = TwitterApi.extract_tokens(
+            TwitterApi.make_request(request_token_url, request_params, request_keys)
+        )
 
-    request_info = get_verifier(
-        consumer_key,
-        consumer_secret,
-        request_info["oauth_token"],
-        request_info["oauth_token_secret"],
-        pin_code
-    )
+        # STEP 2: Get oauth_verifier
+        pin_code = TwitterApi.get_pin_code(request_info["oauth_token"])
 
-    print(request_info)
+        # STEP 3: Get valid oauth tokens
+        access_token_url = "https://api.twitter.com/oauth/access_token"
+        access_params = {
+            "oauth_token": quote(request_info["oauth_token"]),
+            "oauth_consumer_key": quote(self.consumer_key),
+            "oauth_verifier": pin_code
+        }
+        access_keys = [
+            self.consumer_secret,
+            request_info["oauth_token_secret"]
+        ]
+        request_info = TwitterApi.extract_tokens(
+            TwitterApi.make_request(access_token_url, access_params, access_keys)
+        )
 
+        # STEP 4: Fill Class fields
+        self.oauth_token = request_info["oauth_token"]
+        self.oauth_token_secret = request_info["oauth_token_secret"]
+        self.screen_name = request_info["screen_name"]
+        self.user_id = request_info["user_id"]
 
-def get_verifier(consumer_key, consumer_secret, oauth_token, oauth_secret, pin_code):
-    method = "POST"
-    url = "https://api.twitter.com/oauth/access_token"
-    params = {
-        "oauth_token": quote(oauth_token),
-        "oauth_consumer_key": quote(consumer_key),
-        "oauth_verifier": pin_code
-    }
-    params.update(get_static_param_set())
-    signature = get_signature(method, url, params, [consumer_secret, oauth_secret])
-    params["signature"] = quote(signature, safe="")
-    auth_header = create_header(params)
+    @staticmethod
+    def make_request(url, header_info, keys, method="POST", data=None):
 
-    #debug
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    #debug
+        params = {}
+        params.update(header_info)
+        params.update(TwitterApi.get_static_param_set())
 
-    auth_request = urllib.request.Request(url, method="POST")
-    auth_request.add_header("Authorization", auth_header)
+        signature = TwitterApi.get_signature(method, url, params, keys)
+        params["oauth_signature"] = quote(signature, safe="")
+        auth_header = TwitterApi.create_header(params)
 
-    answer = urllib.request.urlopen(auth_request, context=ctx)
-    tokens = answer.read().decode()
-    return extract_tokens(tokens)
+        auth_request = urllib.request.Request(url, method="POST", data=data)
+        auth_request.add_header("Authorization", auth_header)
 
+        answer = urllib.request.urlopen(auth_request)
+        cooked_answer = answer.read().decode()
+        return cooked_answer
 
-def get_pin_code(oauth_token):
-    url = "https://api.twitter.com/oauth/authorize?oauth_token={}"\
-        .format(oauth_token)
-    try:
-        print("Авторизуйтесь в Твиттере и введите сюда код из браузера!")
-        time.sleep(5)
-        webbrowser.open_new_tab(url)
-    except webbrowser.Error:
-        print("Произошла проблема с инициализацией браузера,\n"
-              "откройте данный url у себя в браузере для получения\n"
-              "pin-кода!\n{}".format(url))
-    pin_code = input("Pin-Code: ")  # TODO подключить утилиты
-    return pin_code
+    @staticmethod
+    def get_pin_code(oauth_token):
+        url = "https://api.twitter.com/oauth/authorize?oauth_token={}"\
+            .format(oauth_token)
+        try:
+            print("Авторизуйтесь в Твиттере и введите сюда код из браузера!")
+            time.sleep(5)
+            webbrowser.open_new_tab(url)
+        except webbrowser.Error:
+            print("Произошла проблема с инициализацией браузера,\n"
+                  "откройте данный url у себя в браузере для получения\n"
+                  "pin-кода!\n{}".format(url))
+        pin_code = input("Pin-Code: ")  # TODO подключить утилиты
+        return pin_code
 
+    @staticmethod
+    def get_static_param_set():
+        """
+        :return: кусок хэдера, присутствующий в любом запросе
+        """
+        params = {
+            "oauth_nonce": urllib.request.quote(TwitterApi.get_nonce()),
+            "oauth_timestamp": str(TwitterApi.get_timestamp()),
+            "oauth_signature_method": "HMAC-SHA1",
+            "oauth_version": "1.0"
+        }
+        return params
 
-def get_static_param_set():
-    """
-    :return: кусок хэдера, присутствующий в любом запросе
-    """
-    params = {
-        "oauth_nonce": urllib.request.quote(get_nonce()),
-        "oauth_timestamp": str(get_timestamp()),
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_version": "1.0"
-    }
-    return params
+    @staticmethod
+    def create_header(params):
+        """
+        :param params словарь параметров
+        :return строка вида "OAuth {}", где {} - лексиграфически отсортированные параметры
+        """
+        auth_header = "OAuth "
+        for param in sorted(params):
+            auth_header += '{}="{}", '.format(param, params[param])
+        auth_header = auth_header[:-2]
+        return auth_header
 
+    @staticmethod
+    def extract_tokens(tokens):
+        """
+        функция разбора ответа API (авторизация)
+        :param tokens: строка, вида a=b&c=d
+        :return: словарь из этой строки
+        """
+        pairs = tokens.split("&")
+        answer_list = []
+        for pair in pairs:
+            answer_list.append(pair.split("="))
+        token_dict = {}
+        token_dict.update(answer_list)
+        return token_dict
 
-def get_request_token(consumer_key, consumer_secret):
-    """
-    :param consumer_key: ключ приложения
-    :param consumer_secret: ключ шифрования приложением
-    :return:
-    """
-    method = "POST"
-    url = "https://api.twitter.com/oauth/request_token"
-    params = {
-        "oauth_callback": "oob",
-        "oauth_consumer_key": quote(consumer_key)
-    }
-    params.update(get_static_param_set())
-    signature = get_signature(method, url, params, [consumer_secret])
-    params["oauth_signature"] = quote(signature, safe="")
+    @staticmethod
+    def get_signature(method, link, param_dict, keys):
+        """
+        функция хэширования запроса:
+        :param method - вид запроса POST/GET
+        :param link - ссылка к api
+        :param param_dict - список параметров хэширования
+        :param keys - список ключей хэширования
+        :return хэш HMAC-SHA1 в base64 представлении
+        """
 
-    auth_header = create_header(params)
+        raw = ""
+        for param in sorted(param_dict):
+            raw += "{}={}&".format(quote(param), quote(param_dict[param]))
+        params = raw[:-1]
 
-    #debug
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    #debug
+        key = keys[0] + "&"
+        if len(keys) > 1:
+            key += keys[1]
 
-    auth_request = urllib.request.Request(url, method="POST")
-    auth_request.add_header("Authorization", auth_header)
+        cooked_string = method.upper() + "&"\
+                                       + quote(link, safe="")\
+                                       + "&"\
+                                       + quote(params, safe="")
 
-    answer = urllib.request.urlopen(auth_request, context=ctx)
-    tokens = answer.read().decode()
-    token_dict = extract_tokens(tokens)
-    return token_dict
+        hashed = hmac.new(
+            key=key.encode(),
+            msg=cooked_string.encode(),
+            digestmod=sha1
+        )
+        result = binascii.b2a_base64(hashed.digest()).decode().rstrip("\n")
+        return result
 
+    @staticmethod
+    def get_nonce():
+        """
+        :return произвольная строка, состояющяя из a-zA-Z0-9, длинна 32 символа
+        """
+        period = random.getrandbits(8 * 32)
+        fingerprint = base64.b64encode(bytes(str(period), "utf-8")).decode()
+        good_fingerprint = fingerprint.replace("=", "")
+        return good_fingerprint[:32]
 
-def create_header(params):
-    """
-    :param params словарь параметров
-    :return строка вида "OAuth {}", где {} - лексиграфически отсортированные параметры
-    """
-    auth_header = "OAuth "
-    for param in sorted(params):
-        auth_header += '{}="{}", '.format(param, params[param])
-    auth_header = auth_header[:-2]
-    return auth_header
-
-
-def extract_tokens(tokens):
-    """
-    функция разбора ответа API (авторизация)
-    :param tokens: строка, вида a=b&c=d
-    :return: словарь из этой строки
-    """
-    pairs = tokens.split("&")
-    answer_list = []
-    for pair in pairs:
-        answer_list.append(pair.split("="))
-    token_dict = {}
-    token_dict.update(answer_list)
-    return token_dict
-
-
-def get_signature(method, link, param_dict, keys):
-    """
-    функция хэширования запроса:
-    :param method - вид запроса POST/GET
-    :param link - ссылка к api
-    :param param_dict - список параметров хэширования
-    :param keys - список ключей хэширования
-    :return хэш HMAC-SHA1 в base64 представлении
-    """
-
-    raw = ""
-    for param in sorted(param_dict):
-        raw += "{}={}&".format(quote(param), quote(param_dict[param]))
-    params = raw[:-1]
-
-    key = keys[0] + "&"
-    if len(keys) > 1:
-        key += keys[1]
-
-    cooked_string = method.upper() + "&"\
-                                   + quote(link, safe="")\
-                                   + "&"\
-                                   + quote(params, safe="")
-
-    hashed = hmac.new(
-        key=key.encode(),
-        msg=cooked_string.encode(),
-        digestmod=sha1
-    )
-    result = binascii.b2a_base64(hashed.digest()).decode().rstrip("\n")
-    return result
-
-
-def get_nonce():
-    """
-    :return произвольная строка, состояющяя из a-zA-Z0-9, длинна 32 символа
-    """
-    period = random.getrandbits(8 * 32)
-    fingerprint = base64.b64encode(bytes(str(period), "utf-8")).decode()
-    good_fingerprint = fingerprint.replace("=", "")
-    return good_fingerprint[:32]
-
-
-def get_timestamp():
-    """
-    :return текущее время в формате timestamp
-    """
-    current_time = datetime.datetime.now()
-    timestamp_time = int(current_time.timestamp())
-    return timestamp_time
+    @staticmethod
+    def get_timestamp():
+        """
+        :return текущее время в формате timestamp
+        """
+        current_time = datetime.datetime.now()
+        timestamp_time = int(current_time.timestamp())
+        return timestamp_time
 
 
 if __name__ == '__main__':
-    twitter_auth()
+    user_ex = TwitterApi()
+    user_ex.auth()
