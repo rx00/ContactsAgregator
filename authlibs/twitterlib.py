@@ -5,6 +5,7 @@ import binascii
 import datetime
 import random
 import base64
+import json
 import hmac
 import time
 
@@ -57,20 +58,46 @@ class TwitterApi:
         self.screen_name = request_info["screen_name"]
         self.user_id = request_info["user_id"]
 
+    def _get_friends_amount(self):
+        request_url = "https://api.twitter.com/1.1/friends/ids.json"
+        header = {
+            "oauth_token": quote(self.oauth_token),
+            "oauth_consumer_key": quote(self.consumer_key),
+        }
+        keys = [self.consumer_secret, self.oauth_token_secret]
+        friends_ids = TwitterApi.make_request(
+            request_url,
+            header,
+            keys,
+            method="GET"
+        )
+        friends_ids_dict = json.loads(friends_ids)
+        return len(friends_ids_dict["ids"])
+
+    def get_friends(self):
+        amount = self._get_friends_amount()
+        request_url = "https://api.twitter.com/1.1/friends/list.json"
+        data = "count={}".format(str(amount))
+        # TODO # make byte data + fill header with "count": "20/50/100"
+
     @staticmethod
     def make_request(url, header_info, keys, method="POST", data=None):
 
+        # STEP 1: Create Full Params Dictionary
         params = {}
         params.update(header_info)
         params.update(TwitterApi.get_static_param_set())
 
+        # STEP 2: Get HMAC-SHA1 from params dict and append it to params
         signature = TwitterApi.get_signature(method, url, params, keys)
         params["oauth_signature"] = quote(signature, safe="")
         auth_header = TwitterApi.create_header(params)
 
-        auth_request = urllib.request.Request(url, method="POST", data=data)
+        # STEP 3: Build Request and append Header
+        auth_request = urllib.request.Request(url, method=method, data=data)
         auth_request.add_header("Authorization", auth_header)
 
+        # STEP 4: Send Request and read result
         answer = urllib.request.urlopen(auth_request)
         cooked_answer = answer.read().decode()
         return cooked_answer
@@ -80,7 +107,7 @@ class TwitterApi:
         url = "https://api.twitter.com/oauth/authorize?oauth_token={}"\
             .format(oauth_token)
         try:
-            print("Авторизуйтесь в Твиттере и введите сюда код из браузера!")
+            print("Авторизуйтесь в Твиттере и введите в поле ниже код из браузера!")
             time.sleep(5)
             webbrowser.open_new_tab(url)
         except webbrowser.Error:
@@ -111,7 +138,8 @@ class TwitterApi:
         """
         auth_header = "OAuth "
         for param in sorted(params):
-            auth_header += '{}="{}", '.format(param, params[param])
+            if "oauth" in param:
+                auth_header += '{}="{}", '.format(param, params[param])
         auth_header = auth_header[:-2]
         return auth_header
 
@@ -186,3 +214,4 @@ class TwitterApi:
 if __name__ == '__main__':
     user_ex = TwitterApi()
     user_ex.auth()
+    user_ex.get_friends()
