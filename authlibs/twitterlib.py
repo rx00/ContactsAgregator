@@ -28,6 +28,20 @@ class TwitterApi:
         self.screen_name = ""
         self.user_id = ""
 
+    def load_auth_dict(self, auth_resourses):
+        self.oauth_token = auth_resourses["oauth_token"]
+        self.oauth_token_secret = auth_resourses["oauth_token_secret"]
+        self.screen_name = auth_resourses["screen_name"]
+        self.user_id = auth_resourses["user_id"]
+
+    def get_auth_dict(self):
+        return {
+            "oauth_token": self.oauth_token,
+            "oauth_token_secret": self.oauth_token_secret,
+            "screen_name": self.screen_name,
+            "user_id": self.user_id
+        }
+
     def auth(self):
         """
         :return: заполняет поля идетнификации пользователя в классе

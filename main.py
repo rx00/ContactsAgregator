@@ -8,6 +8,7 @@ import utils.vk_parser
 
 from utils.authutils import text_caller
 from authlibs.vklib import VkApi
+from authlibs.twitterlib import TwitterApi
 from vcardlib import Card
 
 
@@ -131,6 +132,9 @@ class Main:
               .format(len(vk_contacts), len(raw_users)))
 
         self.create_cards(vk_contacts)
+
+        # Twitter import, parse and merge here
+
         self.export_contacts()
 
 
