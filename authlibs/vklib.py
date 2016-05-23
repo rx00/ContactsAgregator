@@ -34,8 +34,6 @@ class VkApi:
             if str(json_answer["id"]) == str(self.id):
                 return True
 
-
-
     def get_friends(self, fields, lang="en"):  # TODO забросить в vklib
         """
         по данным авторизации запрашивает список друзей пользователя
@@ -108,8 +106,8 @@ class VkApi:
 
         full_url = address + "?" + ''.join(arg_list) + \
                              "email=" + urllib.request.quote(login) + \
-                             "&pass=" + urllib.request.quote(password)  # UTF8 fix
-        logger.debug("Formed auth-request: " + full_url[:35] + "[*]")  # logs
+                             "&pass=" + urllib.request.quote(password)
+        logger.debug("Formed auth-request: " + full_url[:35] + "[*]")
         return full_url
 
     @staticmethod
@@ -126,7 +124,7 @@ class VkApi:
         for line in raw_html_lines:
             position = line.find("/login?act=authcheck_code")
             if position >= 0:
-                hash_line = line[position:-13]  # TODO сделать авто-поиск позиции
+                hash_line = line[position:-13]  # TODO clever position
         check_code = urllib.request.quote(text_caller("Auth SMS code"))
         full_url = address + hash_line + "&code=" + check_code + "&remember=0"
         logger.debug("Formed double-auth request: " + full_url[:35] + "[*]")
@@ -206,11 +204,14 @@ class VkApi:
         return {"user_id": user_id, "token": token}
 
     @staticmethod
-    def auth(client_id, permissions):  # TODO фикс дебага!, сделать адекватно!
+    def auth(client_id, permissions):
         """
-        Фукция возвращает данные авторизации по правам и идентификатору приложения
-        Опционально, функция может писать в дебаг файл (debug=True)
-        Опционально, можно указать имя дебаг-файла (debug_file=filename.log)
+        Фукция возвращает данные авторизации по
+         правам и идентификатору приложения
+        Опционально, функция может писать в дебаг файл
+         (debug=True)
+        Опционально, можно указать имя дебаг-файла
+         (debug_file=filename.log)
         Вернет пустой кортеж в случае ошибки
         Вернет кортеж и id и token пользователя при успешном парсинге
         """
@@ -219,9 +220,11 @@ class VkApi:
             urllib.request.HTTPRedirectHandler
         )
 
-        logger.debug("=== Auth Session ===")
+        logger.debug("=== VK Auth Session ===")
 
-        first_response = browser.open(VkApi.request_builder(client_id, permissions))
+        first_response = browser.open(
+            VkApi.request_builder(client_id, permissions)
+        )
         auth_answer = VkApi.auth_form_parser(first_response.read().decode())
         join_response = browser.open(auth_answer)
         page_role = VkApi.response_role(join_response)

@@ -1,4 +1,3 @@
-import datetime
 import pickle
 import logging
 
@@ -8,7 +7,7 @@ from utils.cryptor import AESEncryptError
 logger = logging.getLogger(__name__)
 
 
-def authdata_read(filename):
+def _authdata_read(filename):
     """
     :param filename файл, откуда читать данные пользователя
     """
@@ -17,51 +16,45 @@ def authdata_read(filename):
             auth_info = pickle.load(f)
             return auth_info
     except FileNotFoundError:
-        logger.debug("Файл данных авторизации \"{}\" не найден!"
+        logger.debug("Auth file: \"{}\" not found!"
                      .format(filename))
         return {}
     except OSError:
-        logger.debug("Нет доступа к файлу {}".format(filename))
+        logger.debug("Can't reach {}".format(filename))
         return {}
 
 
-def authdata_write(auth_info, filename):
+def _authdata_write(auth_info, filename):
     """
     запись данных о пользователе в файл
     """
     try:
         with open(filename, "wb") as f:
             pickle.dump(auth_info, f)
-        print("Создан новый файл авторизации!")
         logger.debug("New auth file created!")
     except OSError:
-        print("Нет доступа к файлу {}".format(filename))
-
-
-def timestamp_get(timestamp=0):
-    """
-    при запуске без аргументов вернет текущее время (целое число)
-    при запуске с аргументом (кол-во секунд), вернет
-    (текущая дата + секунды из аргумента)
-    """
-    current_time = datetime.datetime.now()
-    additional = datetime.timedelta(seconds=timestamp)
-    timestamp = int((current_time + additional).timestamp())
-    return timestamp
+        logger.debug("Can't reach {}".format(filename))
 
 
 def write_tokens(social_id, master_key, user_info, data_file):
-    data = authdata_read(data_file)
+    """
+    :param social_id:
+    :param master_key:
+    :param user_info:
+    :param data_file:
+    :return:
+    """
+    data = _authdata_read(data_file)
     for info_obj in user_info.values():
         if "token" in info_obj:
             cryptor = AESEncrypt(info_obj, master_key)
             user_info[info_obj] = cryptor.encrypt()
     data[social_id] = user_info
-    authdata_write(data, data_file)
+    _authdata_write(data, data_file)
 
 
 def get_tokens(social_id, master_key, data_file):
-    read_array = authdata_read(data_file)
+    read_array = _authdata_read(data_file)
     if social_id in read_array:
         current_interest = read_array[social_id]
         for key in current_interest.values():

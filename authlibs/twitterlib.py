@@ -91,7 +91,7 @@ class TwitterApi:
         self.oauth_token_secret = request_info["oauth_token_secret"]
         self.screen_name = request_info["screen_name"]
         self.user_id = request_info["user_id"]
-        logger.debug("Authorization complete for {} with Twitter user_id = "
+        logger.debug("Authorization complete for {} with Twitter user_id = {}"
                      .format(self.screen_name, self.user_id))
 
     def _get_friends_amount(self):
@@ -113,7 +113,7 @@ class TwitterApi:
         friends_ids_dict = json.loads(friends_ids)
         friends_amount = friends_ids_dict["ids"]
         logger.debug("Found {} friends in {} Twitter"
-                     .format(friends_amount, self.screen_name))
+                     .format(len(friends_amount), self.screen_name))
         return friends_amount
 
     def get_friends(self):

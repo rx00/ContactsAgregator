@@ -7,9 +7,10 @@ logger = logging.getLogger(__name__)
 
 
 class Card:
-    def __init__(self, user_info):  # card logging?
+    def __init__(self, user_info):
         self.vk_id = user_info["vk_id"]
-        self.domain = user_info["domain"]  # merge factor
+        self.vk_domain = user_info["domain"]
+        self.twitter_domain = ""
         self.photo = user_info["photo_50"]
         self.last_name_en = user_info["last_name"]  # merge factor
         self.first_name_en = user_info["first_name"]  # merge factor
@@ -25,6 +26,8 @@ class Card:
         card = list()
         card.append("BEGIN:VCARD")
         card.append("VERSION:3.0")
+        card.append("item1.X-ABLabel:Вконтакте")
+        card.append("item2.X-ABLabel:Твиттер")
         card.append("END:VCARD")
         return card
 
@@ -34,7 +37,7 @@ class Card:
         base64 строку в image
         """
         try:
-            if self.photo[-3:] == "jpg":  # jpg у юзеров, png - системное, вк жлобит место
+            if self.photo[-3:] == "jpg":  # jpg у юзеров, png - системное
                 with urlopen(self.photo) as f:
                     string = f.read()
                     self.image = binascii.b2a_base64(string).decode()
@@ -51,21 +54,27 @@ class Card:
         card_lines = Card._lines_pre_gen()
         self._photo_encoder()
 
-        last_name = self.last_name_en
-        first_name = self.first_name_en
-        mobile_phone = self.mobile_phone
-        photo = self.image
-
-        name_line = "N:{};{};;;".format(last_name, first_name)
-        full_name_line = "FN:{} {}".format(first_name, last_name)
-        tel = "TEL;type=CELL;type=VOICE;type=pref:{}".format(mobile_phone)
-        photo_line = "PHOTO;ENCODING=b;TYPE=JPEG:{}".format(photo)
+        name_line = "N:{};{};;;"\
+            .format(self.last_name_en, self.first_name_en)
+        full_name_line = "FN:{} {}"\
+            .format(self.first_name_en, self.last_name_en)
+        tel = "TEL;type=CELL;type=VOICE;type=pref:{}"\
+            .format(self.mobile_phone)
+        photo_line = "PHOTO;ENCODING=b;TYPE=JPEG:{}"\
+            .format(self.image)
+        vk_social_link = "item1.URL;type=pref:vk.com/{}"\
+            .format(self.vk_domain)
+        tw_social_link = "item2.URL;type=pref:twitter.com/{}"\
+            .format(self.twitter_domain)
 
         card_lines.insert(2, name_line)
         card_lines.insert(3, full_name_line)
         card_lines.insert(4, tel)
-        if photo:
-            card_lines.insert(5, photo_line)
+        card_lines.insert(5, vk_social_link)
+        if self.image:
+            card_lines.insert(6, photo_line)
+        if self.twitter_domain:
+            card_lines.insert(7, tw_social_link)
 
         card = ""
         for line in card_lines:
