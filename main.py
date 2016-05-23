@@ -34,19 +34,21 @@ class Main:
         self.card_file = card_file
         self.data_file = data_file
         self.data_support = data_support
+        self.card_list = []
 
-    def export_contacts(self, contacts):
-        card_list = []
-        if len(contacts) > 0:
-            for contact in contacts:
-                card_list.append(Card(contact))
+    def create_cards(self, contacts):
+        for contact in contacts:
+            self.card_list.append(Card(contact))
+
+    def export_contacts(self):
+        if len(self.card_list) > 0:
             try:
                 with open(self.card_file, "w") as card_storage:
                     i = 1
-                    for card in card_list:
+                    for card in self.card_list:
                         card_storage.write(str(card))
                         print("[{}/{}] Контакт {} {} создан".format(
-                            i, len(contacts), card.last_name_en, card.first_name_en
+                            i, len(self.card_list), card.last_name_en, card.first_name_en
                         ))
                         i += 1
             except OSError:
@@ -60,7 +62,7 @@ class Main:
         главный авторизатор ВКонтакте
         """
         auth_resources = {
-            "permissions": "friends",
+            "permissions": "friends,offline",
             "client_id": 5333691
         }
 
@@ -73,30 +75,39 @@ class Main:
             if not os.path.isfile(self.data_file):
                 print("Для начала работы с программой, придумайте свой пароль,\n"
                       "ваши данные для авторизации!")
-            key = text_caller("Master-key")
-            vk_data = authdata.get_vk_token(self.data_file, key)
-            if "token" in vk_data:
-                print("Введен верный мастер-ключ!")
-                auth_resources["token"] = vk_data["token"]
-                auth_resources["id"] = vk_data["id"]
-                bad_token = False
-                logging.debug("Old data mined, vk session still alive!")
+                key = text_caller("Master-key")
             else:
-                bad_key = True
-                print("Введен неверный мастер-ключ!")
+                key = text_caller("Master-key")
+                vk_data = authdata.get_tokens("vk", key, self.data_file)
+                if "token" in vk_data:
+                    print("Введен верный мастер-ключ!")
+                    auth_resources["token"] = vk_data["token"]
+                    auth_resources["id"] = vk_data["id"]
+                    bad_token = False
+                    logging.debug("Old data mined, vk session still alive!")
+                else:
+                    bad_key = True
+                    print("Введен неверный мастер-ключ!")
         else:
             logging.debug("Crypto library not found, turning off data module!")
             print("Библиотека Crypto не найдена!\n"
                   "Сохранение данных авторизации не поддерживается!")
 
         auth_info = VkApi(auth_resources)
+        vk_user_info = {
+            "token": auth_info.token,
+            "id": auth_info.id
+        }
 
         if self.data_support:
             if bad_token:
                 if bad_key:
-                    print("Создайте новый мастер-ключ:")
+                    print(
+                        "Создайте новый мастер-ключ: "
+                        "(ВНИМАНИЕ! Старые данные удалятся!)"
+                          )
                     key = text_caller("Master-key")
-                authdata.write_vk_token(self.data_file, auth_info.token, auth_info.id, key, 86400)
+                authdata.write_tokens("vk", key, vk_user_info, self.data_file)
 
         if auth_info.token == "":
             print("Авторизация не удалась")
@@ -113,21 +124,14 @@ class Main:
         auth_data = self.run_vk_auth()
         parsed_json = auth_data.get_friends(fields)
 
-        if len(parsed_json) == 0:
-            auth_resourses = {
-                "permissions": "friends",
-                "client_id": 5333691
-            }
-            auth_data = VkApi(auth_resourses)  #тут не сохраняется токен в дату, нужен фикс
-            parsed_json = auth_data.get_friends(fields)
-
         print("Вы успешно авторизовались в социальной сети ВКонтакте!")
         raw_users = utils.vk_parser.filter_by_mobile(parsed_json)
-        contacts = utils.vk_parser.extract_correct_mobiles(raw_users)
+        vk_contacts = utils.vk_parser.extract_correct_mobiles(raw_users)
         print("Найдено {} валидных контактов у {} друзей!"
-              .format(len(contacts), len(raw_users)))
+              .format(len(vk_contacts), len(raw_users)))
 
-        self.export_contacts(contacts)
+        self.create_cards(vk_contacts)
+        self.export_contacts()
 
 
 class AuthError(Exception):

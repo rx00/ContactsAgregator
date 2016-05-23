@@ -146,7 +146,7 @@ class TwitterApi:
         signature = TwitterApi._get_signature(method, url, params, keys)
         params["oauth_signature"] = quote(signature, safe="")
         auth_header = TwitterApi._create_header(params)
-        print(auth_header)
+
         # STEP 3: Build Request and append Header (+url)
 
         if get_query is not None:

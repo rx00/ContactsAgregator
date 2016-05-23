@@ -1,6 +1,7 @@
 import getpass
 import sys
 
+
 def text_caller(*args, private=False):
     """
     По принятому тексту инициализирует поток ввода

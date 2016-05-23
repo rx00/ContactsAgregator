@@ -10,18 +10,18 @@ logger = logging.getLogger(__name__)
 
 def authdata_read(filename):
     """
-    чтение данных о пользователе из файла
+    :param filename файл, откуда читать данные пользователя
     """
     try:
         with open(filename, "rb") as f:
             auth_info = pickle.load(f)
             return auth_info
     except FileNotFoundError:
-        print("Файл данных авторизации \"{}\" не найден!"
-              .format(filename))
+        logger.debug("Файл данных авторизации \"{}\" не найден!"
+                     .format(filename))
         return {}
     except OSError:
-        print("Нет доступа к файлу {}".format(filename))
+        logger.debug("Нет доступа к файлу {}".format(filename))
         return {}
 
 
@@ -50,37 +50,30 @@ def timestamp_get(timestamp=0):
     return timestamp
 
 
-def write_vk_token(data_file, token, vk_id, masterkey, timestamp):
-    """
-    по ключу шифрует данные пользователя (его token)
-    """
-    cryptor = AESEncrypt(token, masterkey)
-    good_token = cryptor.encrypt()
-    time = timestamp_get(timestamp-1000)
-    data = {"id": vk_id, "token": good_token, "timestamp": time}
-    authdata_write(filename=data_file, auth_info=data)
-
-
-def get_vk_token(data_file, masterkey):
-    """
-    по мастер-ключу восстанавливает непросроченный токен от ВКонтакте
-    иначе возвращает пустую строку
-    """
+def write_tokens(social_id, master_key, user_info, data_file):
     data = authdata_read(data_file)
-    if len(data) == 0:
-        return {}
+    for info_obj in user_info.values():
+        if "token" in info_obj:
+            cryptor = AESEncrypt(info_obj, master_key)
+            user_info[info_obj] = cryptor.encrypt()
+    data[social_id] = user_info
+    authdata_write(data, data_file)
+
+
+def get_tokens(social_id, master_key, data_file):
+    read_array = authdata_read(data_file)
+    if social_id in read_array:
+        current_interest = read_array[social_id]
+        for key in current_interest.values():
+            if "token" in key:
+                cryptor = AESEncrypt(key, master_key)
+                try:
+                    current_interest[key] = cryptor.decrypt()
+                except AESEncryptError:
+                    current_interest = {}
+        return current_interest
     else:
-        if int(data["timestamp"]) > int(timestamp_get()):
-            encrypted_token = data["token"]
-            cryptor = AESEncrypt(encrypted_token, masterkey)
-            try:
-                token = cryptor.decrypt()
-                data["token"] = token
-                return data
-            except AESEncryptError:
-                return {}
-        else:
-            return {}
+        return {}
 
 if __name__ == '__main__':
     print("Nope, I am a lib!")
