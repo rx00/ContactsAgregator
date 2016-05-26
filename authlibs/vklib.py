@@ -10,31 +10,23 @@ logger = logging.getLogger(__name__)
 
 
 class VkApi:
-    def __init__(self, user_data):
-        if "token" in user_data:
-            self.token = user_data["token"]
-            self.id = user_data["id"]
-        else:
-            client_id = user_data["client_id"]
-            permissions = user_data["permissions"]
-            auth_results = VkApi.auth(client_id, permissions)
-            if len(auth_results) > 0:
-                self.token = auth_results["token"]
-                self.id = auth_results["user_id"]
-            else:
-                self.token = ""
-                self.id = ""
+    def __init__(self, permissions="friends,offline"):
+        self.client_id = 5333691
+        self.permissions = permissions
+        self.token = ""
+        self.id = ""
 
-    def verificator(self):
-        url = "https://api.vk.com/method/friends.get?access_token={}"\
-            .format(self.token)
-        answer = urllib.request.urlopen(url).read().decode()
-        json_answer = json.loads(answer)
-        if "id" in json_answer:
-            if str(json_answer["id"]) == str(self.id):
-                return True
+    def get_tokens(self):
+        return {
+            "token": self.token,
+            "id": self.id
+        }
 
-    def get_friends(self, fields, lang="en"):  # TODO забросить в vklib
+    def set_tokens(self, token_dict):
+        self.token = token_dict["token"]
+        self.id = token_dict["id"]
+
+    def get_friends(self, fields, lang="en"):
         """
         по данным авторизации запрашивает список друзей пользователя
         выводит объект json с данными друзей
@@ -56,12 +48,11 @@ class VkApi:
         parsed_json = json.loads(response)
 
         if "error" in parsed_json:
-            return {}
+            raise VkApiError
         else:
             return parsed_json
 
-    @staticmethod
-    def request_builder(client_id, permissoins):
+    def request_builder(self):
         """
         Постройка запроса для авторизации к api по
         - client_id - идентификатор приложения
@@ -72,12 +63,13 @@ class VkApi:
         url = "https://oauth.vk.com/oauth/authorize?" + \
             "redirect_uri=http://oauth.vk.com/blank.html" + \
             "&response_type=token" + \
-            "&client_id=" + str(client_id) + \
-            "&scope=" + str(permissoins) + \
+            "&client_id=" + str(self.client_id) + \
+            "&scope=" + str(self.permissions) + \
             "&display=mobile" + \
             "&v=" + str(vk_api_version)
-        logger.debug("Auth Form generated for app_id = " + str(client_id) +
-                     " with permissions = " + str(permissoins))
+        logger.debug("Auth Form generated for app_id"
+                     " = {} with permissions = {}"
+                     .format(str(self.client_id), str(self.permissions)))
         return url
 
     @staticmethod
@@ -117,7 +109,7 @@ class VkApi:
         возвращает url для прохождения авторизации
         """
         if response == "":
-            raise ValueError("Empty line!")
+            raise VkApiError
         raw_html_lines = response.split("\n")
         address = "https://m.vk.com"
         hash_line = ""
@@ -137,7 +129,7 @@ class VkApi:
         возвращает url для "нажатия кнопки подтверждения"
         """
         if response == "":
-            raise ValueError("Empty line!")
+            raise VkApiError
         raw_html_lines = response.split("\n")
         full_url = ""
         for line in raw_html_lines:
@@ -203,17 +195,9 @@ class VkApi:
                      "*")
         return {"user_id": user_id, "token": token}
 
-    @staticmethod
-    def auth(client_id, permissions):
+    def auth(self):
         """
-        Фукция возвращает данные авторизации по
-         правам и идентификатору приложения
-        Опционально, функция может писать в дебаг файл
-         (debug=True)
-        Опционально, можно указать имя дебаг-файла
-         (debug_file=filename.log)
-        Вернет пустой кортеж в случае ошибки
-        Вернет кортеж и id и token пользователя при успешном парсинге
+        Обновит поля id и token класса при успешном парсинге
         """
         browser = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor,
@@ -223,26 +207,33 @@ class VkApi:
         logger.debug("=== VK Auth Session ===")
 
         first_response = browser.open(
-            VkApi.request_builder(client_id, permissions)
+            self.request_builder()
         )
         auth_answer = VkApi.auth_form_parser(first_response.read().decode())
         join_response = browser.open(auth_answer)
         page_role = VkApi.response_role(join_response)
         while True:
             if page_role[0] == 1:
-                return VkApi.token_parser(page_role[1])
+                tokens = VkApi.token_parser(page_role[1])
+                self.token = tokens["token"]
+                self.id = tokens["user_id"]
+                break
             elif page_role[0] == 4:
                 logging.debug("Bad login")
                 print("Указан неверный логин или пароль!")
-                return tuple()
+                raise VkApiError
             elif page_role[0] == 6:
                 logging.debug("Unknown error")
                 print("Неизвестная ошибка!")
-                return tuple()
+                raise VkApiError
             else:
                 url_from_page = page_role[1]
                 response = browser.open(url_from_page)
                 page_role = VkApi.response_role(response)
+
+
+class VkApiError(Exception):
+    pass
 
 if __name__ == '__main__':
     print("This library can't be started manually!")
