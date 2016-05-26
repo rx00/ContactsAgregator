@@ -1,6 +1,7 @@
 import sys
 import os
 import logging
+import argparse
 
 from importlib.util import find_spec
 
@@ -9,6 +10,7 @@ from utils.twitter_parser import user_extractor
 
 from utils.authutils import text_caller
 from authlibs.vklib import VkApi
+from authlibs.vklib import VkApiError
 from authlibs.twitterlib import TwitterApi
 from vcardlib import Card
 
@@ -40,26 +42,39 @@ class Main:
         self.master_key = None
 
     def create_cards(self, contacts):
+        """
+        :param contacts: список контактов
+        :return: инициализирует поле класса списком контактов
+        """
         for contact in contacts:
             self.card_list.append(Card(contact))
 
     def export_contacts(self):
+        """
+        :return: экспортирует контакты в файл, предопределенный полем card_file (vCard формат)
+        """
         if len(self.card_list) > 0:
             try:
                 with open(self.card_file, "w") as card_storage:
                     i = 1
                     for card in self.card_list:
-                        card_storage.write(str(card))
+                        try:
+                            card_storage.write(str(card))
+                        except KeyboardInterrupt:
+                            print("Вы прервали процесс записи контактов!\n"
+                                  "Файл может быть поврежден!")
+                            sys.exit()
                         domain_str = ""
                         if card.twitter_domain:
                             domain_str += " + (Twitter)"
-                        print("[{}/{}] Контакт {} {} создан (ВКонтакте){}".format(
-                            i,
-                            len(self.card_list),
-                            card.last_name_en,
-                            card.first_name_en,
-                            domain_str
-                        ))
+                        print("[{}/{}] Контакт {} {} создан (ВКонтакте){}"
+                              .format(
+                                    i,
+                                    len(self.card_list),
+                                    card.last_name_en,
+                                    card.first_name_en,
+                                    domain_str
+                              ))
                         i += 1
             except OSError:
                 print("Программа не может получить доступ к файлу {}!"
@@ -80,7 +95,8 @@ class Main:
                 self.master_key = text_caller("Master-key")  #первый запуск
             else:
                 self.master_key = text_caller("Master-key")  #рабочий запуск
-                data = authdata.get_tokens("vk", self.master_key, self.data_file)
+                data = authdata.get_tokens("vk",
+                                           self.master_key, self.data_file)
                 if len(data) == 0:
                     raise AuthError
 
@@ -139,7 +155,11 @@ class Main:
                   "Удалите файл с данными авторизации, чтобы пересоздать мастер-ключ!")
             sys.exit()
 
-        auth_data = self.run_vk_auth()
+        try:
+            auth_data = self.run_vk_auth()
+        except VkApiError:
+            print("Непредвиденная ошибка! Завершение программы.")
+            sys.exit()
 
         vk_fields = ("domain", "contacts", "photo_50")
         parsed_json = auth_data.get_friends(vk_fields)
@@ -184,31 +204,39 @@ class Main:
               .format(occurences))
 
 
-class AuthError(Exception):
-    pass
+def parse_args():
+    description = "Contacts Aggregator:\n" \
+                  "Collects and exports your " \
+                  "friend's information from " \
+                  "social networks"
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("-c", "--cardfile",
+                        action="store",
+                        help="Cards file name",
+                        default="cards.vcf")
+    parser.add_argument("--debug",
+                        action="store_const",
+                        help="Debug mode",
+                        const="True")
+    parser.add_argument("-d", "--data",
+                        action="store",
+                        help="Data File Name",
+                        default="data")
+    return parser.parse_args()
 
 
 def main():
     """
     точка входа в приложение
     """
-    debug = False
-    cards = "cards.vcf"
-    data = "data"
+    args = parse_args()
+
+    debug = args.debug is not None
+    cards = args.cardfile
+    data = args.data
+
     data_support = find_spec("Crypto") is not None
 
-    if len(sys.argv) > 1:
-        if "--help" in sys.argv:
-            print("====> Генератор адресной книги <====\n"
-                  "В данный момент, программа нуждается в\n"
-                  "дополнительных аргументах(--debug).\n"
-                  "Запуск: python3 {}\n"
-                  "Программе требуются права на запись в папку"
-                  .format(sys.argv[0]))
-            sys.exit()
-        elif "--debug" in sys.argv:
-            debug = True
-            print("Программа запущена в режиме дебага!")
     init_logger(debug)
     try:
         main_point = Main(cards, data, data_support)
@@ -217,6 +245,10 @@ def main():
         print("Не удалось авторизоваться!")
     except SystemExit:
         print("Программа успешно остановлена!")
+
+
+class AuthError(Exception):
+    pass
 
 
 if __name__ == '__main__':
