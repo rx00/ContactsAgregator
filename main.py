@@ -51,7 +51,8 @@ class Main:
 
     def export_contacts(self):
         """
-        :return: экспортирует контакты в файл, предопределенный полем card_file (vCard формат)
+        :return: экспортирует контакты в файл,
+         предопределенный полем card_file (vCard формат)
         """
         if len(self.card_list) > 0:
             try:
@@ -83,9 +84,6 @@ class Main:
             print("Ваши друзья не хотят делиться мобильными телефонами ;(")
 
     def get_master_key(self):
-        """
-        главный авторизатор ВКонтакте
-        """
         if self.data_support:
             logging.debug("Crypto library found!")
             if not os.path.isfile(self.data_file):
@@ -158,14 +156,13 @@ class Main:
         try:
             auth_data = self.run_vk_auth()
         except VkApiError:
-            print("Непредвиденная ошибка! Завершение программы.")
+            print("Ошибка авторизации ВКонтакте! Завершение программы.")
             sys.exit()
 
         vk_fields = ("domain", "contacts", "photo_50")
         parsed_json = auth_data.get_friends(vk_fields)
 
         print("Вы успешно авторизовались в социальной сети ВКонтакте!")
-
         raw_users = utils.vk_parser.filter_by_mobile(parsed_json)
         vk_contacts = utils.vk_parser.extract_correct_mobiles(raw_users)
         print("Найдено {} контактов c мобильными телефонами у {} друзей!"
@@ -212,16 +209,21 @@ def parse_args():
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("-c", "--cardfile",
                         action="store",
-                        help="Cards file name",
+                        help="cards storage",
                         default="cards.vcf")
     parser.add_argument("--debug",
                         action="store_const",
-                        help="Debug mode",
+                        help="debug mode",
                         const="True")
     parser.add_argument("-d", "--data",
                         action="store",
-                        help="Data File Name",
+                        help="authorization storage",
                         default="data")
+    parser.add_argument("--nocrypto",
+                        action="store_const",
+                        help="disable auth storage module",
+                        const="True"
+                        )
     return parser.parse_args()
 
 
@@ -236,6 +238,9 @@ def main():
     data = args.data
 
     data_support = find_spec("Crypto") is not None
+
+    if args.nocrypto is not None:
+        data_support = False
 
     init_logger(debug)
     try:

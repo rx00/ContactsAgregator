@@ -1,5 +1,6 @@
 import urllib.request
 import urllib.parse
+from urllib.request import quote
 import webbrowser
 import binascii
 import datetime
@@ -11,7 +12,6 @@ import hmac
 import time
 
 from hashlib import sha1
-from urllib.request import quote
 from utils.authutils import text_caller
 
 logger = logging.getLogger(__name__)
