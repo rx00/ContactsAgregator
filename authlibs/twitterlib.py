@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class TwitterApi:
-    def __init__(self):
+    def __init__(self, break_auth=False):
         self.oauth_consumer_key =\
             "1RiattuMQATlvkzfzC3YvuI3j"
         self.oauth_consumer_secret =\
@@ -27,6 +27,8 @@ class TwitterApi:
         self.oauth_token_secret = ""
         self.screen_name = ""
         self.user_id = ""
+        self._last_request = None
+        self._break_auth = break_auth
 
     def load_auth_dict(self, auth_resourses):
         self.oauth_token = auth_resourses["oauth_token"]
@@ -42,40 +44,47 @@ class TwitterApi:
             "user_id": self.user_id
         }
 
-    def auth(self):
+    def auth(self, step_2_code=""):
         """
         :return: заполняет поля идетнификации пользователя в классе
         """
         # STEP 1: Get Request_Token
-        request_token_url = "https://api.twitter.com/oauth/request_token"
-        request_params = {
-            "oauth_callback": "oob",
-            "oauth_consumer_key": quote(self.oauth_consumer_key)
-        }
-        request_keys = [self.oauth_consumer_secret]
-        request_info = TwitterApi._extract_tokens(
-            TwitterApi.make_request(
-                request_token_url,
-                request_params,
-                request_keys
+        if not step_2_code:
+            request_token_url = "https://api.twitter.com/oauth/request_token"
+            request_params = {
+                "oauth_callback": "oob",
+                "oauth_consumer_key": quote(self.oauth_consumer_key)
+            }
+            request_keys = [self.oauth_consumer_secret]
+            request_info = TwitterApi._extract_tokens(
+                TwitterApi.make_request(
+                    request_token_url,
+                    request_params,
+                    request_keys
+                )
             )
-        )
-        logger.debug("Request Token recived")
-
+            self._last_request = request_info
+            logger.debug("Request Token recived")
+            if self._break_auth:
+                self.oauth_token = self._last_request["oauth_token"]
+                return 0
         # STEP 2: Get oauth_verifier
-        pin_code = TwitterApi._get_pin_code(request_info["oauth_token"])
+            pin_code = \
+                TwitterApi._get_pin_code(self._last_request["oauth_token"])
+        else:
+            pin_code = step_2_code
         logger.debug("Pin-Code recived")
 
         # STEP 3: Get valid oauth tokens
         access_token_url = "https://api.twitter.com/oauth/access_token"
         access_params = {
-            "oauth_token": quote(request_info["oauth_token"]),
+            "oauth_token": quote(self._last_request["oauth_token"]),
             "oauth_consumer_key": quote(self.oauth_consumer_key),
             "oauth_verifier": pin_code
         }
         access_keys = [
             self.oauth_consumer_secret,
-            request_info["oauth_token_secret"]
+            self._last_request["oauth_token_secret"]
         ]
         request_info = TwitterApi._extract_tokens(
             TwitterApi.make_request(

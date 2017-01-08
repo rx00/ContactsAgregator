@@ -10,11 +10,16 @@ logger = logging.getLogger(__name__)
 
 
 class VkApi:
-    def __init__(self, permissions="friends,offline"):
+    def __init__(self, permissions="friends,offline", await_code=False):
         self.client_id = 5333691
         self.permissions = permissions
         self.token = ""
         self.id = ""
+        self.vk_login = None
+        self.vk_password = None
+        self.await_code = await_code
+        self.browser = None
+        self.state = "Ожидание старта авторизации"
 
     def get_tokens(self):
         return {
@@ -23,6 +28,7 @@ class VkApi:
         }
 
     def set_tokens(self, token_dict):
+        self.state = "Токены получены"
         self.token = token_dict["token"]
         self.id = token_dict["id"]
 
@@ -48,7 +54,7 @@ class VkApi:
         parsed_json = json.loads(response)
 
         if "error" in parsed_json:
-            raise VkApiError
+            raise VkApiError(parsed_json["error"])
         else:
             return parsed_json
 
@@ -59,6 +65,7 @@ class VkApi:
         - permissions - права доступа
         возвращает url для обращения к авторизации вк
         """
+        self.state = "Старт авторизации..."
         vk_api_version = 5.45
         url = "https://oauth.vk.com/oauth/authorize?" + \
             "redirect_uri=http://oauth.vk.com/blank.html" + \
@@ -72,8 +79,7 @@ class VkApi:
                      .format(str(self.client_id), str(self.permissions)))
         return url
 
-    @staticmethod
-    def auth_form_parser(response):
+    def auth_form_parser(self, response):
         """
         парсер страницы авторизации
         возвращает url для прохождения авторизации
@@ -93,8 +99,15 @@ class VkApi:
             value = argument[2][8:-1]
             arg_list.append(arg + "=" + value + "&")
 
-        login = text_caller("Login")
-        password = text_caller("Password", private=True)
+        if not self.vk_login:
+            login = text_caller("Login")
+        else:
+            login = self.vk_login
+
+        if not self.vk_password:
+            password = text_caller("Password", private=True)
+        else:
+            password = self.vk_password
 
         full_url = address + "?" + ''.join(arg_list) + \
                              "email=" + urllib.request.quote(login) + \
@@ -102,8 +115,7 @@ class VkApi:
         logger.debug("Formed auth-request: " + full_url[:35] + "[*]")
         return full_url
 
-    @staticmethod
-    def two_step_auth_parser(response):
+    def two_step_auth_parser(self, response):
         """
         парсер страницы двухэтапной авторизации по строке
         возвращает url для прохождения авторизации
@@ -117,13 +129,17 @@ class VkApi:
             position = line.find("/login?act=authcheck_code")
             if position >= 0:
                 hash_line = line[position:-13]  # TODO clever position
-        check_code = urllib.request.quote(text_caller("Auth SMS code"))
-        full_url = address + hash_line + "&code=" + check_code + "&remember=0"
+        if not self.await_code:
+            code_text = text_caller("Auth SMS code")
+        else:
+            code_text = ""
+
+        check_code = urllib.request.quote(code_text)
+        full_url = address + hash_line + "&remember=0" + "&code=" + check_code
         logger.debug("Formed double-auth request: " + full_url[:35] + "[*]")
         return full_url
 
-    @staticmethod
-    def post_auth_verifier(response):
+    def post_auth_verifier(self, response):
         """
         парсер страницы подтверждения работы с данным приложением
         возвращает url для "нажатия кнопки подтверждения"
@@ -139,8 +155,7 @@ class VkApi:
         logger.debug("Formed button-answer request: " + full_url[:35] + "[*]")
         return full_url
 
-    @staticmethod
-    def response_role(response):
+    def response_role(self, response):
         """
         по url запроса/содержимому страницы фунция определяет
         тип необходимого обработчика страницы и вызывает его
@@ -159,24 +174,31 @@ class VkApi:
 
             elif "<b>код подтверждения</b> из SMS" in response_page:
                 logging.debug("SMS auth started")
-                answer_url = VkApi.two_step_auth_parser(response_page)
-                return 3, answer_url  # sms auth
+                answer_url = self.two_step_auth_parser(response_page)
+                if self.await_code:
+                    return -1, answer_url
+                return 3, answer_url
 
             elif "Для продолжения Вам необходимо войти" in response_page:
                 logger.debug("Login form opened")
-                answer_url = VkApi.auth_form_parser(response_page)
+                answer_url = self.auth_form_parser(response_page)
                 return 2, answer_url  # some trouble?0_o
 
             elif "Приложению будут доступны:" in response_page:
                 logger.debug("Access button form opened")
-                answer_url = VkApi.post_auth_verifier(response_page)
+                answer_url = self.post_auth_verifier(response_page)
                 return 5, answer_url  # first auth in current app
 
+            elif "в личном сообщении от Администрации" in response_page:
+                logging.debug("Need for private message, redirecting to SMS")
+                answer_url = self.two_step_auth_parser(response_page)
+                if self.await_code:
+                    return -1, answer_url
+                return 3, answer_url
             else:
                 return 6,  # something_bad
 
-    @staticmethod
-    def token_parser(token_url):
+    def token_parser(self, token_url):
         """
         Функция возвращает кортеж по url токена
         В кортеже содержится id и token пользователя
@@ -195,41 +217,48 @@ class VkApi:
                      "*")
         return {"user_id": user_id, "token": token}
 
-    def auth(self):
+    def auth(self, custom_url=""):
         """
         Обновит поля id и token класса при успешном парсинге
         """
-        browser = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor,
-            urllib.request.HTTPRedirectHandler
-        )
+        if not custom_url:
+            self.browser = urllib.request.build_opener(
+                urllib.request.HTTPCookieProcessor,
+                urllib.request.HTTPRedirectHandler
+            )
 
-        logger.debug("=== VK Auth Session ===")
+            logger.debug("=== VK Auth Session ===")
 
-        first_response = browser.open(
-            self.request_builder()
-        )
-        auth_answer = VkApi.auth_form_parser(first_response.read().decode())
-        join_response = browser.open(auth_answer)
-        page_role = VkApi.response_role(join_response)
+            first_response = self.browser.open(
+                self.request_builder()
+            )
+            auth_answer = self.auth_form_parser(first_response.read().decode())
+            join_response = self.browser.open(auth_answer)
+            page_role = self.response_role(join_response)
+        else:
+            page_role = 3, custom_url
         while True:
             if page_role[0] == 1:
-                tokens = VkApi.token_parser(page_role[1])
+                tokens = self.token_parser(page_role[1])
                 self.token = tokens["token"]
                 self.id = tokens["user_id"]
                 break
             elif page_role[0] == 4:
                 logging.debug("Bad login")
-                print("Указан неверный логин или пароль!")
-                raise VkApiError
+                raise VkApiError("Указан неверный логин или пароль!")
             elif page_role[0] == 6:
                 logging.debug("Unknown error")
                 print("Неизвестная ошибка!")
-                raise VkApiError
+                raise VkApiError(page_role)
+            elif page_role[0] == -1:
+                logging.debug("Stopped loop due to awaiting two step code!")
+                self.state = "Ожидание кода двухэтапной авторизации..."
+                self.await_code = page_role[1]
+                break
             else:
                 url_from_page = page_role[1]
-                response = browser.open(url_from_page)
-                page_role = VkApi.response_role(response)
+                response = self.browser.open(url_from_page)
+                page_role = self.response_role(response)
 
 
 class VkApiError(Exception):

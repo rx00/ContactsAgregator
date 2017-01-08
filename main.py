@@ -54,7 +54,7 @@ class Main:
         :return: экспортирует контакты в файл,
          предопределенный полем card_file (vCard формат)
         """
-        if len(self.card_list) > 0:
+        if self.card_list:
             try:
                 with open(self.card_file, "w") as card_storage:
                     i = 1
@@ -155,6 +155,7 @@ class Main:
 
         try:
             auth_data = self.run_vk_auth()
+            print(auth_data.token)
         except VkApiError:
             print("Ошибка авторизации ВКонтакте! Завершение программы.")
             sys.exit()
