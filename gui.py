@@ -4,13 +4,20 @@ from PyQt5.QtWidgets import \
 from PyQt5 import QtGui
 from PyQt5.QtCore import QThread
 from authlibs import vklib, twitterlib
+from PyQt5.QtWidgets import QListWidget, QApplication, QListWidgetItem
+from PyQt5.QtGui import QIcon, QPixmap
+from vcardlib import Card
 import webbrowser
+import utils.vk_parser
+import utils.twitter_parser
+from utils.twitter_parser import user_extractor
 
 
 class Main(QWidget):
     def __init__(self):
         super().__init__()
         self.active_elements = {}
+        self.card_list = []
         self.init_ui()
 
     def init_ui(self):
@@ -208,8 +215,66 @@ class Main(QWidget):
         self.api_thread.start()
 
     def ready(self):
-        print(self.twitter.oauth_token_secret)
+        self.active_elements["main"] = {}
+        gui = self.active_elements["main"]
+        for element in self.active_elements["tw_auth"].values():
+            try:
+                element.deleteLater()
+            except RuntimeError:
+                pass
+            except AttributeError:
+                pass
 
+        self.setStyleSheet("background-color: #e2e2e2")
+        load_friends_button = QPushButton(self)
+        load_friends_button.setText("Начать загрузку контактов")
+        load_friends_button.clicked.connect(self.run_friends_loading)
+        load_friends_button.move(105, 350)
+        load_friends_button.show()
+        gui["load_friends_button"] = load_friends_button
+
+    def show_contacts(self):
+        gui = self.active_elements["main"]
+        listWidget = QListWidget(self)
+        listWidget.setGeometry(20,20, 360, 400)
+        for element in gui.values():
+            try:
+                element.deleteLater()
+            except RuntimeError:
+                pass
+        gui["listWidget"] = listWidget
+        for card in self.card_list:
+            list_name = "(Vk) " + card.first_name_en + card.last_name_en
+            if card.twitter_domain:
+                list_name = "(Twitter) "+list_name
+            item = QListWidgetItem(list_name)
+            pixmap = QPixmap()
+            pixmap.loadFromData(card.pre_loaded_photo)
+            icon = QIcon()
+            icon.addPixmap(pixmap)
+            item.setIcon(icon)
+            listWidget.addItem(item)
+        listWidget.show()
+
+    def run_friends_loading(self):
+        load_label = QLabel(self)
+        load_label.move(108, 310)
+        gui = self.active_elements["main"]
+        load_label.setText(
+            "Начинаем загрузку Ваших контактов\n, пожалуйста, ожидайте..."
+        )
+        load_label.setStyleSheet(
+            "font-family: Arial; color: #ffffff;"
+        )
+        gui["load_label"] = load_label
+        load_label.show()
+        if self.twitter.oauth_token_secret:
+            load_users_thread = \
+                LoadItemsThread(self.api_obj, self.card_list, self.twitter)
+        else:
+            load_users_thread = LoadItemsThread(self.api_obj, self.card_list)
+        load_users_thread.finished.connect(self.show_contacts)
+        load_users_thread.start()
 
     def run_two_step_auth(self, code):
         gui = self.active_elements["vk_auth"]
@@ -254,6 +319,43 @@ class AuthObjectThread(QThread):
             self.api_object.auth(self.code_url)
         except vklib.VkApiError as e:
             self.api_object._qt_thread_error = str(e)
+
+
+class LoadItemsThread(QThread):
+    def __init__(self, vk_api_obj, card_list_link, twitter=None):
+        QThread.__init__(self)
+        self.vk_api_obj = vk_api_obj
+        self.card_list_link = card_list_link
+        self.twitter = twitter
+
+    def __del__(self):
+        self.wait()
+
+    def create_cards(self, contacts):
+        for contact in contacts:
+            self.card_list_link.append(Card(contact))
+
+    def load_twitter(self):
+        twitter_friends_json = self.twitter.get_friends()
+        twitter_vk_ids = user_extractor(twitter_friends_json)
+        for friend_id in twitter_vk_ids.keys():
+            for card in self.card_list_link:
+                twitter_vk = twitter_vk_ids[friend_id]["current_mined_vk"]
+                if card.vk_domain == twitter_vk:
+                    card.twitter_domain = \
+                        twitter_vk_ids[friend_id]["current_domain"]
+
+    def run(self):
+        vk_fields = ("domain", "contacts", "photo_50")
+        parsed_json = self.vk_api_obj.get_friends(vk_fields)
+        raw_users = utils.vk_parser.filter_by_mobile(parsed_json)
+        vk_contacts = utils.vk_parser.extract_correct_mobiles(raw_users)
+        self.create_cards(vk_contacts)
+        if self.twitter is not None:
+            self.load_twitter()
+        for card in self.card_list_link:
+            card.preload_photo()
+
 
 
 if __name__ == '__main__':

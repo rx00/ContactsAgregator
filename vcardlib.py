@@ -16,6 +16,7 @@ class Card:
         self.first_name_en = user_info["first_name"]  # merge factor
         self.mobile_phone = user_info["mobile_phone"]
         self.image = ""
+        self.pre_loaded_photo = None
 
     @staticmethod
     def _lines_pre_gen():
@@ -31,6 +32,18 @@ class Card:
         card.append("END:VCARD")
         return card
 
+    def preload_photo(self):
+        try:
+            if self.photo[-3:] == "jpg":  # jpg у юзеров, png - системное
+                with urlopen(self.photo) as f:
+                    photo_binary = f.read()
+                    self.pre_loaded_photo = photo_binary
+                    logger.debug("Downloaded image for {}!"
+                                 .format(self.vk_id))
+        except URLError:
+            logger.debug("Can't reach photo file!")
+            self.pre_loaded_photo = None
+
     def _photo_encoder(self):
         """
         качаем фото по ссылки из поля photo и пишем
@@ -38,11 +51,14 @@ class Card:
         """
         try:
             if self.photo[-3:] == "jpg":  # jpg у юзеров, png - системное
-                with urlopen(self.photo) as f:
-                    string = f.read()
-                    self.image = binascii.b2a_base64(string).decode()
-                    logger.debug("Downloaded and encoded image for {}!"
-                                 .format(self.vk_id))
+                if self.pre_loaded_photo is None:
+                    with urlopen(self.photo) as f:
+                        string = f.read()
+                else:
+                    string = self.pre_loaded_photo
+                self.image = binascii.b2a_base64(string).decode()
+                logger.debug("Downloaded and encoded image for {}!"
+                             .format(self.vk_id))
         except URLError:
             logger.debug("Can't reach photo file!")
             self.image = ""
