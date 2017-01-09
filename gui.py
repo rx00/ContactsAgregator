@@ -136,10 +136,14 @@ class Main(QWidget):
 
     def vk_object_ready(self):
         try:
-            self.active_elements["vk_auth"]["send_code_button"].deleteLater()
-            self.active_elements["vk_auth"]["vk_pass_code"].deleteLater()
-            self.active_elements["vk_auth"]["logo_box"].deleteLater()
-        except RuntimeError:
+            for element in self.active_elements["vk_auth"].values():
+                try:
+                    element.deleteLater()
+                except RuntimeError:
+                    pass
+                except AttributeError:
+                    pass
+        except KeyError:
             pass
 
         if self.api_obj.state == "Ожидание кода двухэтапной авторизации...":
