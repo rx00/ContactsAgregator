@@ -239,14 +239,17 @@ class VkApi:
             page_role = 3, custom_url
         while True:
             if page_role[0] == 1:
+                self.state = "Токены получены"
                 tokens = self.token_parser(page_role[1])
                 self.token = tokens["token"]
                 self.id = tokens["user_id"]
                 break
             elif page_role[0] == 4:
+                self.state = "Неверный логин или пароль"
                 logging.debug("Bad login")
                 raise VkApiError("Указан неверный логин или пароль!")
             elif page_role[0] == 6:
+                self.state = "Неизвестная ошибка"
                 logging.debug("Unknown error")
                 print("Неизвестная ошибка!")
                 raise VkApiError(page_role)

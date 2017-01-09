@@ -1,13 +1,16 @@
 import sys
+import webbrowser
 from PyQt5.QtWidgets import \
-    QApplication, QWidget, QDesktopWidget, QLabel, QLineEdit, QPushButton
+    QWidget, QDesktopWidget, QLabel, QLineEdit, QPushButton
 from PyQt5 import QtGui
 from PyQt5.QtCore import QThread
 from authlibs import vklib, twitterlib
 from PyQt5.QtWidgets import QListWidget, QApplication, QListWidgetItem
 from PyQt5.QtGui import QIcon, QPixmap
+from urllib.error import HTTPError
+
+
 from vcardlib import Card
-import webbrowser
 import utils.vk_parser
 import utils.twitter_parser
 from utils.twitter_parser import user_extractor
@@ -39,7 +42,7 @@ class Main(QWidget):
             self.active_elements["vk_auth"] = {}
             gui = self.active_elements["vk_auth"]
             logo_box = QLabel(self)
-            pixmap = QtGui.QPixmap("logo.png")
+            pixmap = QtGui.QPixmap("gui_images/logo.png")
             logo_box.setPixmap(pixmap)
             logo_box.move(108, 100)
 
@@ -102,9 +105,12 @@ class Main(QWidget):
             if self.api_obj.state == \
                     "Ожидание кода двухэтапной авторизации...":
                 gui = self.active_elements["vk_auth"]
-                gui["vk_user_field_box"].deleteLater()
-                gui["vk_pass_field_box"].deleteLater()
-                gui["vk_auth_button"].deleteLater()
+                try:
+                    gui["vk_user_field_box"].deleteLater()
+                    gui["vk_pass_field_box"].deleteLater()
+                    gui["vk_auth_button"].deleteLater()
+                except RuntimeError:
+                    pass
                 if "label" in gui:
                     gui["label"].deleteLater()
                 vk_pass_code = QLineEdit(self)
@@ -129,9 +135,16 @@ class Main(QWidget):
                     self.show_vk_auth()
 
     def vk_object_ready(self):
-        self.active_elements["vk_auth"]["send_code_button"].deleteLater()
-        self.active_elements["vk_auth"]["vk_pass_code"].deleteLater()
-        self.active_elements["vk_auth"]["logo_box"].deleteLater()
+        try:
+            self.active_elements["vk_auth"]["send_code_button"].deleteLater()
+            self.active_elements["vk_auth"]["vk_pass_code"].deleteLater()
+            self.active_elements["vk_auth"]["logo_box"].deleteLater()
+        except RuntimeError:
+            pass
+
+        if self.api_obj.state == "Ожидание кода двухэтапной авторизации...":
+            self.show_additional_fields()
+            return 0
 
         self.active_elements["vk_auth"].clear()
         self.active_elements["tw_auth"] = {}
@@ -139,7 +152,7 @@ class Main(QWidget):
         self.setStyleSheet("background-color: #1da0f2")
         gui["tw_auth"] = {}
         twitter_label = QLabel(self)
-        twitter_label.setPixmap(QtGui.QPixmap("tw.png"))
+        twitter_label.setPixmap(QtGui.QPixmap("gui_images/tw.png"))
         twitter_label.move(112, 100)
         twitter_label.show()
 
@@ -164,6 +177,7 @@ class Main(QWidget):
         twitter_ignore_auth.setGeometry(100, 440, 200, 20)
         twitter_ignore_auth.setText("Продолжить без авторизации")
         twitter_ignore_auth.setStyleSheet("background-color: #c0c0c0")
+        twitter_ignore_auth.clicked.connect(self.ready)
         twitter_ignore_auth.show()
 
         gui["twitter_ignore_auth"] = twitter_ignore_auth
@@ -184,7 +198,10 @@ class Main(QWidget):
 
     def run_twitter_auth(self):
         gui = self.active_elements["tw_auth"]
-        gui["twitter_run_auth"].deleteLater()
+        try:
+            gui["twitter_run_auth"].deleteLater()
+        except RuntimeError:
+            pass
         url = "https://api.twitter.com/oauth/authorize?oauth_token={}"\
             .format(self.twitter.oauth_token)
         webbrowser.open_new_tab(url)
@@ -215,6 +232,20 @@ class Main(QWidget):
         self.api_thread.start()
 
     def ready(self):
+        try:
+            if self.twitter._qt_thread_error \
+                    or not self.twitter.oauth_token_secret:
+                try:
+                    for element in self.active_elements["tw_auth"].values():
+                        element.deleteLater()
+                except RuntimeError:
+                    pass
+                self.run_twitter_auth()
+                return 0
+        except AttributeError:
+            pass
+
+
         self.active_elements["main"] = {}
         gui = self.active_elements["main"]
         for element in self.active_elements["tw_auth"].values():
@@ -225,7 +256,16 @@ class Main(QWidget):
             except AttributeError:
                 pass
 
+        logo_box = QLabel(self)
+        pixmap = QtGui.QPixmap("gui_images/download.png")
+        logo_box.setPixmap(pixmap)
+        logo_box.move(120, 100)
+        logo_box.resize(200, 200)
+        logo_box.show()
+        gui["logo_box"] = logo_box
+
         self.setStyleSheet("background-color: #e2e2e2")
+
         load_friends_button = QPushButton(self)
         load_friends_button.setText("Начать загрузку контактов")
         load_friends_button.clicked.connect(self.run_friends_loading)
@@ -255,26 +295,53 @@ class Main(QWidget):
             item.setIcon(icon)
             listWidget.addItem(item)
         listWidget.show()
+        export_button = QPushButton(self)
+        export_button.setGeometry(100, 435, 200, 20)
+        export_button.setStyleSheet("background-color: #c0c0c0")
+        export_button.clicked.connect(self.export_contacts)
+        export_button.setText("Экспортировать в *.vcf")
+        export_button.show()
+        gui["export_button"] = export_button
+
+    def export_contacts(self):
+        try:
+            with open("cards.vcf", "w", encoding="utf-8") as card_storage:
+                for card in self.card_list:
+                    card_storage.write(
+                        str(card)
+                    )
+        except OSError:
+            print("Программа не может получить доступ к файлу {}!"
+                  .format("cards.vcf"))
+        app.quit()
 
     def run_friends_loading(self):
         load_label = QLabel(self)
-        load_label.move(108, 310)
+        load_label.move(100, 310)
         gui = self.active_elements["main"]
         load_label.setText(
-            "Начинаем загрузку Ваших контактов\n, пожалуйста, ожидайте..."
+            "Начинаем загрузку Ваших контактов,\n      пожалуйста, ожидайте..."
         )
         load_label.setStyleSheet(
-            "font-family: Arial; color: #ffffff;"
+            "font-family: Arial;"
         )
         gui["load_label"] = load_label
+        gui["load_friends_button"].setDisabled(True)
+        gui["load_friends_button"].setText("Загружаем...")
         load_label.show()
-        if self.twitter.oauth_token_secret:
-            load_users_thread = \
-                LoadItemsThread(self.api_obj, self.card_list, self.twitter)
-        else:
-            load_users_thread = LoadItemsThread(self.api_obj, self.card_list)
-        load_users_thread.finished.connect(self.show_contacts)
-        load_users_thread.start()
+        try:
+            if self.twitter.oauth_token_secret:
+                self.load_users_thread = \
+                    LoadItemsThread(self.api_obj, self.card_list, self.twitter)
+            else:
+                self.load_users_thread = \
+                    LoadItemsThread(self.api_obj, self.card_list)
+        except AttributeError:
+            self.load_users_thread = \
+                LoadItemsThread(self.api_obj, self.card_list)
+
+        self.load_users_thread.finished.connect(self.show_contacts)
+        self.load_users_thread.start()
 
     def run_two_step_auth(self, code):
         gui = self.active_elements["vk_auth"]
@@ -319,6 +386,8 @@ class AuthObjectThread(QThread):
             self.api_object.auth(self.code_url)
         except vklib.VkApiError as e:
             self.api_object._qt_thread_error = str(e)
+        except HTTPError as e:
+            self.api_object._qt_thread_error = str(e)
 
 
 class LoadItemsThread(QThread):
@@ -355,7 +424,6 @@ class LoadItemsThread(QThread):
             self.load_twitter()
         for card in self.card_list_link:
             card.preload_photo()
-
 
 
 if __name__ == '__main__':
