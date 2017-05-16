@@ -11,6 +11,7 @@ from utils.twitter_parser import user_extractor
 from utils.authutils import text_caller
 from authlibs.vklib import VkApi
 from authlibs.vklib import VkApiError
+from authlibs.vk_auth_patch import authorize
 from authlibs.twitterlib import TwitterApi
 from vcardlib import Card
 
@@ -40,6 +41,7 @@ class Main:
         self.data_support = data_support
         self.card_list = []
         self.master_key = None
+        self.web_auth = False
 
     def create_cards(self, contacts):
         """
@@ -90,16 +92,17 @@ class Main:
                 print("Для начала работы с программой, "
                       "придумайте свой пароль,\n"
                       "ваши данные для авторизации!")
-                self.master_key = text_caller("Master-key")  #первый запуск
+                self.master_key = text_caller("Master-key")
             else:
-                self.master_key = text_caller("Master-key")  #рабочий запуск
+                self.master_key = text_caller("Master-key")
                 data = authdata.get_tokens("vk",
                                            self.master_key, self.data_file)
                 if len(data) == 0:
-                    raise AuthError
+                    raise AuthError()
 
     def run_vk_auth(self):
         vk_user = VkApi()
+
         if self.data_support:
             data = authdata.get_tokens(
                 "vk",
@@ -108,16 +111,31 @@ class Main:
             )
             if "token" in data:
                 vk_user.set_tokens(data)
-            else:
-                vk_user.auth()
-                authdata.write_tokens(
-                    "vk",
-                    self.master_key,
-                    vk_user.get_tokens(),
-                    self.data_file
-                )
-        else:
-            vk_user.auth()
+                return vk_user
+
+        try:
+            if self.web_auth:
+                data = authorize(5333691)
+                vk_user.set_tokens(data)
+                if self.data_support:
+                    authdata.write_tokens(
+                        "vk",
+                        self.master_key,
+                        vk_user.get_tokens(),
+                        self.data_file
+                    )
+                return vk_user
+        except Exception:
+            pass
+
+        vk_user.auth()
+        if self.data_support:
+            authdata.write_tokens(
+                "vk",
+                self.master_key,
+                vk_user.get_tokens(),
+                self.data_file
+            )
         return vk_user
 
     def run_twitter_auth(self):
@@ -155,7 +173,6 @@ class Main:
 
         try:
             auth_data = self.run_vk_auth()
-            print(auth_data.token)
         except VkApiError:
             print("Ошибка авторизации ВКонтакте! Завершение программы.")
             sys.exit()
@@ -225,6 +242,10 @@ def parse_args():
                         help="disable auth storage module",
                         const="True"
                         )
+    parser.add_argument("--webauth",
+                        action="store_const",
+                        help="run web auth",
+                        const="True")
     return parser.parse_args()
 
 
@@ -235,6 +256,7 @@ def main():
     args = parse_args()
 
     debug = args.debug is not None
+    webauth = args.webauth is not None
     cards = args.cardfile
     data = args.data
 
@@ -246,6 +268,8 @@ def main():
     init_logger(debug)
     try:
         main_point = Main(cards, data, data_support)
+        if webauth:
+            main_point.web_auth = True
         main_point.contacts_aggregator()
     except AuthError:
         print("Не удалось авторизоваться!")

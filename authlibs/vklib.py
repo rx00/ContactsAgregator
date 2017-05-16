@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class VkApi:
-    def __init__(self, permissions="friends,offline", await_code=False):
+    def __init__(self, permissions="groups,status,wall,offline", await_code=False):
         self.client_id = 5333691
         self.permissions = permissions
         self.token = ""
